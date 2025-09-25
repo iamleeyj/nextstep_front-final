@@ -23,9 +23,6 @@
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #555; }
-        .dark ::-webkit-scrollbar-track { background: #2d3748; }
-        .dark ::-webkit-scrollbar-thumb { background: #718096; }
-        .dark ::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
 
         /* Page transition effect */
         .page-content { animation: fadeIn 0.5s ease-in-out; }
@@ -44,21 +41,37 @@
         .widget.drag-over { transform: scale(1.02); }
 
         /* Tooltip styles */
-        .tooltip-container { position: relative; display: inline-block; }
-        .tooltip-text { visibility: hidden; width: 250px; background-color: #555; color: #fff; text-align: left; border-radius: 6px; padding: 8px; position: absolute; z-index: 1; bottom: 125%; left: 50%; margin-left: -125px; opacity: 0; transition: opacity 0.3s; font-size: 12px; font-weight: normal; }
+        .tooltip-container { position: relative; display: inline-flex; align-items: center; }
+        .tooltip-text { visibility: hidden; width: 250px; background-color: #333; color: #fff; text-align: left; border-radius: 6px; padding: 8px 12px; position: absolute; z-index: 100; bottom: 125%; left: 50%; margin-left: -125px; opacity: 0; transition: opacity 0.3s; font-size: 12px; font-weight: normal; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
         .tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
 
+        /* Tutorial Overlay Styles */
+        #tutorial-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.7); z-index: 9998; }
+        #tutorial-spotlight { position: fixed; border-radius: 8px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7); z-index: 9999; transition: all 0.4s ease-in-out; }
+        #tutorial-popover { position: fixed; background: white; color: #333; padding: 20px; border-radius: 8px; max-width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 10000; transition: opacity 0.3s, transform 0.3s; }
+        .tutorial-arrow { position: absolute; width: 0; height: 0; border-style: solid; }
+        .tutorial-arrow.up { border-width: 0 10px 10px 10px; border-color: transparent transparent white transparent; top: -10px; left: calc(50% - 10px); }
+        .tutorial-arrow.down { border-width: 10px 10px 0 10px; border-color: white transparent transparent transparent; bottom: -10px; left: calc(50% - 10px); }
     </style>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300">
+<body class="bg-gray-100 text-gray-800 transition-colors duration-300">
 
-    <div id="app" class="flex flex-col min-h-screen">
-        </div>
-    
-    <div id="modal-container">
-        </div>
+    <div id="app" class="flex flex-col min-h-screen"></div>
+    <div id="modal-container"></div>
+    <div id="tutorial-container"></div>
 
     <script type="module">
+        // ===================================================================================
+        // SVG ICONS
+        // ===================================================================================
+        const icons = {
+            arrowUp: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>`,
+            arrowDown: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>`,
+            starFilled: `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-400" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>`,
+            starOutline: `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>`,
+            info: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 cursor-pointer" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
+        };
+
         // ===================================================================================
         // MOCK DATA (백엔드 API 모의 데이터)
         // ===================================================================================
@@ -173,22 +186,26 @@
             currentUser: JSON.parse(localStorage.getItem('nextstep-user')),
             currentPage: 'home',
             currentParams: null,
-            theme: localStorage.getItem('nextstep-theme') || 'light',
             kospiStocks: [],
             favorites: JSON.parse(localStorage.getItem('nextstep-favorites')) || ['005930', '035420'],
             widgets: JSON.parse(localStorage.getItem('nextstep-widgets')) || [
                 { id: 'indices', type: 'indices' }, { id: 'kospiChart', type: 'kospiChart' },
                 { id: 'topVolume', type: 'topVolume' }, { id: 'favorites', type: 'favorites' },
-                { id: 'aiPicks', type: 'aiPicks' },
             ],
             isWidgetEditMode: false,
             domesticSort: { key: 'volume', order: 'desc' },
             charts: {},
             draggedWidgetId: null,
             detailChartType: 'line',
-            aiChartType: 'line',
-            aiChartShowHistorical: false, // AI 차트에서 과거 데이터 표시 여부
-            activeIndicators: {}, // { chartId: ['MA', 'BB'] }
+            detailChartIndicators: { sma20: false, ema60: false },
+            aiChartType: 'candlestick',
+            tutorial: {
+                active: false,
+                step: 0,
+                seen: localStorage.getItem('nextstep-tutorial-seen') === 'true',
+                stockCode: 'T0001',
+                stockName: '(튜토리얼) 넥스트스텝'
+            }
         };
 
         // ===================================================================================
@@ -198,85 +215,36 @@
             return new Date(timestamp).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
         }
 
-        function formatKoreanCurrency(value) {
-            return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(value);
-        }
-
-        function renderLogo() {
-            const logoFile = state.theme === 'light' ? 'logo_w.png' : 'logo_b.png';
-            return `<img src="${logoFile}" alt="NextStep Logo" class="h-8 w-auto">`;
-        }
-        
-        // --- Indicator Calculation Functions ---
-        function calculateMA(data, period) {
+        function calculateSMA(data, period) {
             const result = [];
-            for (let i = 0; i < data.length; i++) {
-                if (i < period - 1) {
-                    result.push({ t: data[i].t, y: null });
-                } else {
-                    let sum = 0;
-                    for (let j = 0; j < period; j++) {
-                        sum += data[i - j].c;
-                    }
-                    result.push({ t: data[i].t, y: sum / period });
-                }
+            for (let i = period - 1; i < data.length; i++) {
+                const sum = data.slice(i - period + 1, i + 1).reduce((acc, val) => acc + val.c, 0);
+                result.push({ t: data[i].t, y: sum / period });
             }
             return result;
         }
 
-        function calculateBollingerBands(data, period, stdDevMultiplier) {
-            const ma = calculateMA(data, period).map(d => d.y);
-            const upper = [];
-            const lower = [];
-
-            for (let i = period - 1; i < data.length; i++) {
-                let slice = data.slice(i - period + 1, i + 1);
-                let stdDev = Math.sqrt(slice.map(d => Math.pow(d.c - ma[i], 2)).reduce((a, b) => a + b) / period);
-                upper.push({ t: data[i].t, y: ma[i] + (stdDev * stdDevMultiplier) });
-                lower.push({ t: data[i].t, y: ma[i] - (stdDev * stdDevMultiplier) });
-            }
-            return { upper, lower };
-        }
-        
-        function calculateRSI(data, period) {
+        function calculateEMA(data, period) {
             const result = [];
-            let gains = [];
-            let losses = [];
-
-            for (let i = 1; i < data.length; i++) {
-                const change = data[i].c - data[i - 1].c;
-                gains.push(change > 0 ? change : 0);
-                losses.push(change < 0 ? -change : 0);
-            }
-
-            let avgGain = gains.slice(0, period).reduce((a, b) => a + b, 0) / period;
-            let avgLoss = losses.slice(0, period).reduce((a, b) => a + b, 0) / period;
+            const k = 2 / (period + 1);
+            if (data.length < period) return [];
+            
+            let sma = data.slice(0, period).reduce((acc, val) => acc + val.c, 0) / period;
+            result.push({ t: data[period - 1].t, y: sma });
 
             for (let i = period; i < data.length; i++) {
-                 if (i < period) {
-                    result.push({ t: data[i].t, y: null });
-                    continue;
-                 }
-                if(i > period) {
-                    avgGain = (avgGain * (period - 1) + gains[i-1]) / period;
-                    avgLoss = (avgLoss * (period - 1) + losses[i-1]) / period;
-                }
-                if (avgLoss === 0) {
-                    result.push({ t: data[i].t, y: 100 });
-                } else {
-                    const rs = avgGain / avgLoss;
-                    result.push({ t: data[i].t, y: 100 - (100 / (1 + rs)) });
-                }
+                const ema = (data[i].c * k) + (result[result.length - 1].y * (1 - k));
+                result.push({ t: data[i].t, y: ema });
             }
             return result;
         }
-
 
         // ===================================================================================
         // RENDER FUNCTIONS
         // ===================================================================================
         const appContainer = document.getElementById('app');
         const modalContainer = document.getElementById('modal-container');
+        const tutorialContainer = document.getElementById('tutorial-container');
         
         function renderApp() {
             if (!state.isLoggedIn) {
@@ -284,11 +252,11 @@
                 return;
             }
             appContainer.innerHTML = `
-                <header id="app-header" class="bg-white dark:bg-gray-800 shadow-md sticky top-0 z-40 transition-colors duration-300"></header>
+                <header id="app-header" class="bg-white shadow-md sticky top-0 z-40 transition-colors duration-300"></header>
                 <main id="app-main" class="flex-grow container mx-auto p-4 md:p-6"></main>`;
             renderPage();
             
-            if (localStorage.getItem('nextstep-hide-welcome') !== 'true' && !sessionStorage.getItem('welcome-shown')) {
+            if (localStorage.getItem('nextstep-hide-welcome') !== 'true' && !sessionStorage.getItem('welcome-shown') && !state.tutorial.seen) {
                 renderWelcomeModal();
                 sessionStorage.setItem('welcome-shown', 'true');
             }
@@ -301,17 +269,23 @@
                 { id: 'home', text: '홈' }, { id: 'domestic', text: '국내' }, { id: 'news', text: '뉴스' },
                 { id: 'market', text: '시장' }, { id: 'ai', text: 'AI 분석' }, { id: 'mock', text: '모의투자' }, { id: 'my', text: 'MY' }
             ];
-            const navItems = navLinks.map(link => `<a href="#" data-page="${link.id}" class="nav-link px-3 py-2 rounded-md text-sm font-medium transition-colors ${state.currentPage === link.id ? 'bg-blue-600 text-white' : 'text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'}">${link.text}</a>`).join('');
+            const navItems = navLinks.map(link => `<a href="#" data-page="${link.id}" class="nav-link px-3 py-2 rounded-md text-sm font-medium transition-colors ${state.currentPage === link.id ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-200'}">${link.text}</a>`).join('');
             header.innerHTML = `
                 <div class="container mx-auto px-4 sm:px-6 lg:px-8"><div class="flex items-center justify-between h-16">
                     <div class="flex items-center">
-                        ${renderLogo()}
-                        <nav class="hidden md:flex ml-10 space-x-4">${navItems}</nav>
+                        <a href="#" data-page="home" class="flex-shrink-0 flex items-center gap-2">
+                             <svg class="h-10 w-auto" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 2L2 7V17L12 22L22 17V7L12 2Z" fill="#3B82F6"/>
+                                <path d="M12 2L17 4.5V13.5L12 11V2Z" fill="#60A5FA"/>
+                                <path d="M12 11L7 13.5V20L12 22V11Z" fill="#2563EB"/>
+                             </svg>
+                             <span class="font-bold text-xl text-gray-800">NextStep</span>
+                        </a>
                     </div>
+                    <nav class="hidden md:flex flex-grow justify-center space-x-4">${navItems}</nav>
                     <div class="flex items-center space-x-4">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300"><strong>${state.currentUser.username}</strong>님</span>
-                        <button id="logout-btn" class="text-sm font-medium text-gray-500 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 btn-active">로그아웃</button>
-                        <button id="theme-toggle-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><span id="theme-icon">${state.theme === 'light' ? '🌙' : '☀️'}</span></button>
+                        <span class="text-sm font-medium text-gray-700"><strong>${state.currentUser.username}</strong>님</span>
+                        <button id="logout-btn" class="text-sm font-medium text-gray-500 hover:text-blue-600 btn-active">로그아웃</button>
                     </div>
                 </div></div>`;
         }
@@ -340,27 +314,24 @@
         // --- Auth & Modal Pages ---
         function renderLoginPage(error = null) {
             appContainer.innerHTML = `
-            <div class="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-                <div class="max-w-md w-full bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg">
-                    <div class="w-40 mx-auto mb-6">${renderLogo()}</div>
+            <div class="min-h-screen flex items-center justify-center bg-gray-50">
+                <div class="max-w-md w-full bg-white p-8 rounded-lg shadow-lg">
+                    <div class="flex justify-center items-center mb-6 gap-2">
+                         <svg class="h-12 w-auto" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7V17L12 22L22 17V7L12 2Z" fill="#3B82F6"/><path d="M12 2L17 4.5V13.5L12 11V2Z" fill="#60A5FA"/><path d="M12 11L7 13.5V20L12 22V11Z" fill="#2563EB"/></svg>
+                         <span class="font-bold text-3xl text-gray-800">NextStep</span>
+                    </div>
                     <form id="login-form">
                         ${error ? `<p class="text-red-500 text-sm mb-4 text-center">${error}</p>` : ''}
                         <div class="mb-4">
-                            <label for="username" class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">아이디</label>
-                            <input type="text" id="username" name="username" required class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" value="test">
+                            <label for="username" class="block text-sm font-medium mb-1 text-gray-700">아이디</label>
+                            <input type="text" id="username" name="username" required class="w-full px-3 py-2 border border-gray-300 rounded-md" value="test">
                         </div>
-                        <div class="mb-6 relative">
-                            <label for="password" class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">비밀번호</label>
-                            <input type="password" id="password" name="password" required class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" value="test1234">
-                            <button type="button" id="password-toggle" class="absolute inset-y-0 right-0 top-6 pr-3 flex items-center text-sm leading-5 text-gray-500 dark:text-gray-400">
-                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                            </button>
+                        <div class="mb-6">
+                            <label for="password" class="block text-sm font-medium mb-1 text-gray-700">비밀번호</label>
+                            <input type="password" id="password" name="password" required class="w-full px-3 py-2 border border-gray-300 rounded-md" value="test1234">
                         </div>
-                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition-colors btn-active">로그인</button>
-                        <p class="text-center mt-4 text-sm text-gray-600 dark:text-gray-400">계정이 없으신가요? <a href="#" id="go-to-signup" class="text-blue-500 hover:underline">회원가입</a></p>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700">로그인</button>
+                        <p class="text-center mt-4 text-sm text-gray-600">계정이 없으신가요? <a href="#" id="go-to-signup" class="text-blue-500 hover:underline">회원가입</a></p>
                     </form>
                 </div>
             </div>`;
@@ -368,16 +339,16 @@
 
         function renderSignupPage(error = null) {
             appContainer.innerHTML = `
-            <div class="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-                <div class="max-w-md w-full bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg">
-                    <h2 class="text-2xl font-bold text-center mb-6 text-gray-900 dark:text-white">회원가입</h2>
+            <div class="min-h-screen flex items-center justify-center bg-gray-50">
+                <div class="max-w-md w-full bg-white p-8 rounded-lg shadow-lg">
+                    <h2 class="text-2xl font-bold text-center mb-6 text-gray-900">회원가입</h2>
                     ${error ? `<p class="text-red-500 text-sm mb-4 text-center">${error}</p>` : ''}
                     <form id="signup-form">
-                        <div class="mb-4"><label for="email" class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">이메일</label><input type="email" id="email" required class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"></div>
-                        <div class="mb-4"><label for="username" class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">아이디</label><input type="text" id="username" required class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"></div>
-                        <div class="mb-6 relative"><label for="password" class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">비밀번호</label><input type="password" id="password" required class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"></div>
-                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition-colors btn-active">가입하기</button>
-                        <p class="text-center mt-4 text-sm text-gray-600 dark:text-gray-400">이미 계정이 있으신가요? <a href="#" id="go-to-login" class="text-blue-500 hover:underline">로그인</a></p>
+                        <div class="mb-4"><label for="email" class="block text-sm font-medium mb-1 text-gray-700">이메일</label><input type="email" id="email" required class="w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                        <div class="mb-4"><label for="username" class="block text-sm font-medium mb-1 text-gray-700">아이디</label><input type="text" id="username" required class="w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                        <div class="mb-6"><label for="password" class="block text-sm font-medium mb-1 text-gray-700">비밀번호</label><input type="password" id="password" required class="w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700">가입하기</button>
+                        <p class="text-center mt-4 text-sm text-gray-600">이미 계정이 있으신가요? <a href="#" id="go-to-login" class="text-blue-500 hover:underline">로그인</a></p>
                     </form>
                 </div>
             </div>`;
@@ -386,23 +357,24 @@
         function renderWelcomeModal() {
             modalContainer.innerHTML = `
             <div id="welcome-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4">
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 max-w-lg w-full transform transition-all scale-95 opacity-0">
+                <div class="bg-white rounded-lg shadow-2xl p-8 max-w-lg w-full transform transition-all scale-95 opacity-0">
                     <div class="text-center">
-                         <div class="w-32 mx-auto mb-4">${renderLogo()}</div>
-                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">NextStep에 오신 것을 환영합니다!</h2>
-                        <p class="text-gray-600 dark:text-gray-300 mb-6">AI 기술로 당신의 성공적인 투자를 돕는 파트너입니다.</p>
+                        <svg class="h-12 w-auto mx-auto mb-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7V17L12 22L22 17V7L12 2Z" fill="#3B82F6"/><path d="M12 2L17 4.5V13.5L12 11V2Z" fill="#60A5FA"/><path d="M12 11L7 13.5V20L12 22V11Z" fill="#2563EB"/></svg>
+                        <h2 class="text-2xl font-bold text-gray-900 mb-2">NextStep에 오신 것을 환영합니다!</h2>
+                        <p class="text-gray-600 mb-6">AI 기술로 당신의 성공적인 투자를 돕는 파트너입니다.</p>
                     </div>
                     <div class="space-y-4 text-left mb-6">
-                        <h3 class="font-semibold text-lg text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 pb-2">주요 기능</h3>
-                        <p class="text-gray-700 dark:text-gray-300">📈 <strong class="font-medium">AI 예측 차트:</strong> GRU 모델이 분석한 미래 주가를 현재 차트와 함께 확인하세요.</p>
-                        <p class="text-gray-700 dark:text-gray-300">⭐ <strong class="font-medium">나만의 관심종목:</strong> 자주 찾는 종목을 '즐겨찾기'하고, 홈 위젯에서 바로 확인하세요.</p>
-                        <p class="text-gray-700 dark:text-gray-300">📊 <strong class="font-medium">핵심 경제 지표:</strong> 금, 유가 등 시장의 흐름을 읽는 필수 데이터를 제공합니다.</p>
+                        <h3 class="font-semibold text-lg text-gray-800 border-b border-gray-200 pb-2">주요 기능</h3>
+                        <p class="text-gray-700">📈 <strong class="font-medium">AI 예측 및 고급 차트:</strong> AI 예측과 기술적 보조지표(SMA, EMA)로 심층 분석을 경험하세요.</p>
+                        <p class="text-gray-700">⭐ <strong class="font-medium">나만의 홈 화면:</strong> 자주 찾는 위젯을 홈 화면에 배치하고 드래그하여 순서를 바꿔보세요.</p>
+                        <p class="text-gray-700">📊 <strong class="font-medium">핵심 경제 지표:</strong> 금, 유가 등 시장의 흐름을 읽는 필수 데이터를 제공합니다.</p>
                     </div>
                     <div class="flex flex-col sm:flex-row gap-3">
-                        <button id="modal-tour-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg btn-active">시작하기</button>
+                        <button id="modal-tour-btn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg">바로 시작하기</button>
+                        <button id="modal-start-tutorial-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">가이드 시작하기</button>
                     </div>
                     <div class="mt-6 text-center">
-                        <label class="flex items-center justify-center text-sm text-gray-500 dark:text-gray-400 cursor-pointer"><input type="checkbox" id="modal-dont-show-again" class="mr-2"> 다시는 보지 않기</label>
+                        <label class="flex items-center justify-center text-sm text-gray-500 cursor-pointer"><input type="checkbox" id="modal-dont-show-again" class="mr-2"> 다시는 보지 않기</label>
                     </div>
                 </div>
             </div>`;
@@ -416,7 +388,10 @@
             container.innerHTML = `
                 <div class="flex justify-between items-center mb-4">
                     <h1 class="text-2xl font-bold">홈</h1>
-                    <button id="widget-edit-toggle" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg btn-active">${editButtonText}</button>
+                    <div class="flex items-center gap-2">
+                        ${state.isWidgetEditMode ? `<div class="tooltip-container"><span class="text-sm text-gray-500">위젯을 길게 눌러 드래그하면 순서를 변경할 수 있습니다.</span></div>` : ''}
+                        <button id="widget-edit-toggle" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg btn-active">${editButtonText}</button>
+                    </div>
                 </div>
                 <div id="widget-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
                 ${state.isWidgetEditMode ? renderAddWidgetPanel() : ''}`;
@@ -425,12 +400,15 @@
         
         function renderAddWidgetPanel() {
             const availableWidgets = [
-                { type: 'indices', name: '핵심 지표' }, { type: 'kospiChart', name: 'KOSPI 차트' },
-                { type: 'topVolume', name: '종목' }, { type: 'favorites', name: '내 즐겨찾기' },
-                { type: 'aiPicks', name: 'AI 추천' }
+                { type: 'indices', name: 'KOSPI 지수' }, { type: 'kospiChart', name: 'KOSPI 차트' },
+                { type: 'gold', name: '금 시세' }, { type: 'oil', name: '유가 정보' },
+                { type: 'topVolume', name: '주요 거래량 종목' }, { type: 'favorites', name: '내 즐겨찾기' }
             ];
-            const widgetButtons = availableWidgets.map(w => `<button data-widget-type="${w.type}" class="add-widget-btn text-left p-3 rounded-lg ${state.widgets.some(sw => sw.type === w.type) ? 'bg-gray-200 dark:bg-gray-600 cursor-not-allowed text-gray-500' : 'bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900'}" ${state.widgets.some(sw => sw.type === w.type) ? 'disabled' : ''}><p class="font-semibold">${w.name}</p></button>`).join('');
-            return `<div id="add-widget-panel" class="mt-8 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md"><h3 class="text-lg font-bold mb-4">위젯 추가하기</h3><div class="grid grid-cols-2 sm:grid-cols-4 gap-4">${widgetButtons}</div></div>`;
+            const widgetButtons = availableWidgets.map(w => {
+                const isAdded = state.widgets.some(sw => sw.type === w.type);
+                return `<button data-widget-type="${w.type}" class="add-widget-btn text-left p-3 rounded-lg ${isAdded ? 'bg-gray-200 cursor-not-allowed text-gray-500' : 'bg-gray-100 hover:bg-blue-100'}" ${isAdded ? 'disabled' : ''}><p class="font-semibold">${w.name}</p></button>`
+            }).join('');
+            return `<div id="add-widget-panel" class="mt-8 bg-white p-6 rounded-lg shadow-md"><h3 class="text-lg font-bold mb-4">위젯 추가하기</h3><div class="grid grid-cols-2 sm:grid-cols-4 gap-4">${widgetButtons}</div></div>`;
         }
 
         async function renderWidgets() {
@@ -442,7 +420,7 @@
                 const widgetEl = document.createElement('div');
                 widgetEl.id = widgetConfig.id;
                 widgetEl.dataset.widgetType = widgetConfig.type;
-                widgetEl.className = 'widget bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md relative transition-transform';
+                widgetEl.className = 'widget bg-white p-6 rounded-lg shadow-md relative transition-transform';
                 if(state.isWidgetEditMode) {
                     widgetEl.draggable = true;
                     widgetEl.classList.add('cursor-move');
@@ -451,66 +429,69 @@
                 let content = '';
                 if (state.isWidgetEditMode) content += `<button data-widget-id="${widgetConfig.id}" class="remove-widget-btn absolute -top-2 -right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center font-bold text-xs z-10">&times;</button>`;
                 
+                const indicesData = await mockApi.getIndices();
                 let isClickable = false;
                 switch (widgetConfig.type) {
-                    case 'indices': content += renderIndicesWidget(await mockApi.getIndices()); break;
+                    case 'indices': content += renderIndicesWidget(indicesData); break;
+                    case 'gold': content += renderGoldWidget(indicesData); break;
+                    case 'oil': content += renderOilWidget(indicesData); break;
                     case 'kospiChart': widgetEl.classList.add('md:col-span-2', 'xl:col-span-2'); content += renderKospiChartWidget(); break;
                     case 'topVolume': isClickable = true; content += renderTopVolumeWidget(); break;
                     case 'favorites': isClickable = true; content += await renderFavoritesWidget(); break;
-                    case 'aiPicks': isClickable = true; content += await renderAiPicksWidget(); break;
                 }
                 widgetEl.innerHTML = content;
                 if(isClickable && !state.isWidgetEditMode) {
-                    widgetEl.querySelectorAll('li[data-stock-code]').forEach(li => li.classList.add('cursor-pointer', 'hover:bg-gray-100', 'dark:hover:bg-gray-700', 'p-1', 'rounded'));
+                    widgetEl.querySelectorAll('li[data-stock-code]').forEach(li => li.classList.add('cursor-pointer', 'hover:bg-gray-100', 'p-1', 'rounded'));
                 }
                 grid.appendChild(widgetEl);
 
-                if(widgetConfig.type === 'kospiChart') updateKospiChart(7, 'line');
+                if(widgetConfig.type === 'kospiChart') updateKospiChart(7);
             }
         }
         
-        function renderIndicesWidget(data) { return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">핵심 경제 지표</h3><div class="space-y-3"><div class="flex justify-between items-center"><span class="font-medium text-gray-700 dark:text-gray-300">KOSPI</span><div>${data.kospi.value.toFixed(2)} <span class="${data.kospi.change > 0 ? 'text-red-500':'text-blue-500'}">${data.kospi.change > 0 ? '▲' : '▼'} ${Math.abs(data.kospi.change).toFixed(2)}</span></div></div><div class="flex justify-between items-center"><span class="font-medium text-gray-700 dark:text-gray-300">금 (1kg)</span><div>${formatKoreanCurrency(data.gold.price1kg)}</div></div><div class="flex justify-between items-center"><span class="font-medium text-gray-700 dark:text-gray-300">휘발유</span><div>${formatKoreanCurrency(data.oil.gasoline)}</div></div></div>`; }
-        function renderKospiChartWidget(){ return `<div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">KOSPI 지수</h3><div class="flex space-x-1 text-xs"><button data-days="7" class="kospi-chart-period-btn px-2 py-1 rounded bg-blue-600 text-white">1주</button><button data-days="30" class="kospi-chart-period-btn px-2 py-1 rounded bg-gray-200 dark:bg-gray-600">1달</button><button data-days="365" class="kospi-chart-period-btn px-2 py-1 rounded bg-gray-200 dark:bg-gray-600">1년</button></div></div><div class="h-48"><canvas id="home-kospi-chart"></canvas></div>`; }
-        function renderTopVolumeWidget() { const stocks = [...state.kospiStocks].sort((a,b)=>b.volume-a.volume).slice(0,5); return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">종목</h3><ul id="top-volume-list" class="space-y-2">${stocks.map(s => `<li data-stock-code="${s.code}"><div class="flex justify-between text-sm items-center"><span class="text-gray-800 dark:text-gray-200">${s.name}</span><span class="${s.change > 0 ? 'text-red-500' : 'text-blue-500'}">${s.price.toLocaleString()}</span></div></li>`).join('')}</ul>`; }
-        async function renderFavoritesWidget() { const stocks = state.kospiStocks.filter(s => state.favorites.includes(s.code)); return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">내 즐겨찾기</h3><ul class="divide-y dark:divide-gray-700">${stocks.length ? stocks.map(s => `<li data-stock-code="${s.code}" class="py-2"><div class="flex justify-between items-center"><span class="font-medium text-gray-800 dark:text-gray-200">${s.name}</span><span class="${s.change > 0 ? 'text-red-500' : 'text-blue-500'}">${s.price.toLocaleString()}</span></div></li>`).join('') : '<li class="text-center text-gray-500 dark:text-gray-400 py-4">즐겨찾는 종목이 없습니다.</li>'}</ul>`; }
-        async function renderAiPicksWidget() { const picks = await mockApi.getAiRecommendations(); return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">AI 추천</h3><ul class="space-y-2">${picks.slice(0, 3).map(p => `<li data-stock-code="${p.code}"><div class="flex justify-between text-sm items-center"><span class="text-gray-800 dark:text-gray-200">${p.name}</span><span class="text-xs font-bold px-2 py-1 rounded-full ${{'매수':'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300','매도':'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300','보유':'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-300'}[p.signal]}">${p.signal}</span></div></li>`).join('')}</ul>`; }
+        function renderIndicesWidget(data) { return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">KOSPI 지수</h3><div class="space-y-3"><div class="flex justify-between items-center"><span class="font-medium text-gray-700">현재 지수</span><div>${data.kospi.value.toFixed(2)} <span class="${data.kospi.change > 0 ? 'text-red-500':'text-blue-500'}">${data.kospi.change > 0 ? icons.arrowUp : icons.arrowDown} ${Math.abs(data.kospi.change).toFixed(2)}</span></div></div></div>`; }
+        function renderGoldWidget(data) { return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">금 시세</h3><div class="space-y-3"><div class="flex justify-between items-center"><span class="font-medium text-gray-700">1kg</span><div>${data.gold.price1kg.toLocaleString()}원</div></div><div class="flex justify-between items-center"><span class="font-medium text-gray-700">100g</span><div>${data.gold.price100g.toLocaleString()}원</div></div></div>`; }
+        function renderOilWidget(data) { return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">유가 정보</h3><div class="space-y-3"><div class="flex justify-between items-center"><span class="font-medium text-gray-700">휘발유</span><div>${data.oil.gasoline.toLocaleString()}원</div></div><div class="flex justify-between items-center"><span class="font-medium text-gray-700">경유</span><div>${data.oil.diesel.toLocaleString()}원</div></div></div>`; }
+        function renderKospiChartWidget(){ return `<div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">KOSPI 지수</h3><div class="flex space-x-1 text-xs"><button data-days="7" class="kospi-chart-period-btn px-2 py-1 rounded bg-blue-600 text-white">1주</button><button data-days="30" class="kospi-chart-period-btn px-2 py-1 rounded bg-gray-200">1달</button><button data-days="365" class="kospi-chart-period-btn px-2 py-1 rounded bg-gray-200">1년</button></div></div><div class="h-48"><canvas id="home-kospi-chart"></canvas></div>`; }
+        function renderTopVolumeWidget() { const stocks = [...state.kospiStocks].sort((a,b)=>b.volume-a.volume).slice(0,5); const sign = (val) => val > 0 ? '+' : ''; const color = (val) => val > 0 ? 'text-red-500' : val < 0 ? 'text-blue-500' : 'text-gray-500'; return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">주요 거래량 종목</h3><ul id="top-volume-list" class="space-y-2">${stocks.map(s => `<li data-stock-code="${s.code}"><div class="flex justify-between text-sm items-center"><span class="text-gray-800">${s.name}</span><div class="text-right"><span class="${color(s.change)}">${s.price.toLocaleString()}원</span><br/><span class="text-xs ${color(s.change)}">${sign(s.changeRate)}${s.changeRate.toFixed(2)}%</span></div></div></li>`).join('')}</ul>`; }
+        async function renderFavoritesWidget() { const stocks = state.kospiStocks.filter(s => state.favorites.includes(s.code)); return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">내 즐겨찾기</h3><ul class="divide-y">${stocks.length ? stocks.map(s => `<li data-stock-code="${s.code}" class="py-2"><div class="flex justify-between items-center"><span class="font-medium text-gray-800">${s.name}</span><span class="${s.change > 0 ? 'text-red-500' : 'text-blue-500'}">${s.price.toLocaleString()}원</span></div></li>`).join('') : '<li class="text-center text-gray-500 py-4">즐겨찾는 종목이 없습니다.</li>'}</ul>`; }
         
         // --- Domestic Page & Modal ---
-        function renderDomesticPage(container) { container.innerHTML = `<h1 class="text-2xl font-bold mb-1">국내</h1><p class="text-gray-500 dark:text-gray-400 mb-6">KOSPI 종목의 현재 시세를 확인하고, 상세 차트를 분석해보세요.</p><div class="mb-4"><input type="text" id="stock-search" placeholder="종목명 또는 코드를 검색하세요..." class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"></div><div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-x-auto"><table class="w-full text-left"><thead class="bg-gray-50 dark:bg-gray-700"><tr><th class="p-4 w-12"></th><th class="p-4 font-semibold cursor-pointer sortable-header" data-sort-key="name">종목명</th><th class="p-4 font-semibold text-right cursor-pointer sortable-header" data-sort-key="price">현재가</th><th class="p-4 font-semibold text-right cursor-pointer sortable-header" data-sort-key="change">등락</th><th class="p-4 font-semibold text-right cursor-pointer sortable-header" data-sort-key="changeRate">등락률</th><th class="p-4 font-semibold text-right cursor-pointer sortable-header" data-sort-key="volume">거래량</th></tr></thead><tbody id="stock-list-body"></tbody></table></div>`; renderStockList(state.kospiStocks); }
-        function renderStockList(stocks) { const listBody=document.getElementById('stock-list-body'); if(!listBody)return; const sortedStocks=[...stocks].sort((a,b)=>{const{key,order}=state.domesticSort;if(a[key]<b[key])return order==='asc'?-1:1;if(a[key]>b[key])return order==='asc'?1:-1;return 0}); document.querySelectorAll('.sortable-header').forEach(h=>{h.innerHTML=h.innerHTML.replace(/ [▲▼]$/,'');if(h.dataset.sortKey===state.domesticSort.key)h.innerHTML+=state.domesticSort.order==='asc'?' ▲':' ▼'}); if(sortedStocks.length===0){listBody.innerHTML='<tr><td colspan="6" class="text-center p-8 text-gray-500 dark:text-gray-400">검색 결과가 없습니다.</td></tr>';return} listBody.innerHTML=sortedStocks.map(s=>{const isFavorite=state.isLoggedIn&&state.favorites.includes(s.code);const color=s.change>0?'text-red-500':s.change<0?'text-blue-500':'text-gray-500 dark:text-gray-400';const sign=s.change>0?'+':'';return`<tr class="stock-row hover:bg-gray-100 dark:hover:bg-gray-700 border-b last:border-b-0 dark:border-gray-700" data-stock-code="${s.code}"><td class="p-4"><button class="toggle-favorite-btn text-2xl z-10 relative" data-stock-code="${s.code}">${state.isLoggedIn?(isFavorite?'⭐':'☆'):'☆'}</button></td><td class="p-4 font-medium"><div class="text-gray-900 dark:text-white">${s.name}</div><div class="text-sm text-gray-400">${s.code}</div></td><td class="p-4 text-right font-semibold ${color}">${s.price.toLocaleString()}</td><td class="p-4 text-right ${color}">${sign}${s.change.toLocaleString()}</td><td class="p-4 text-right ${color}">${sign}${s.changeRate.toFixed(2)}%</td><td class="p-4 text-right text-sm text-gray-600 dark:text-gray-400">${s.volume.toLocaleString()}</td></tr>`}).join('')}
+        function renderDomesticPage(container) { container.innerHTML = `<h1 class="text-2xl font-bold mb-1">국내</h1><p class="text-gray-500 mb-6">KOSPI 종목의 현재 시세를 확인하고, 상세 차트를 분석해보세요.</p><div class="mb-4"><input type="text" id="stock-search" placeholder="종목명 또는 코드를 검색하세요..." class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></div><div class="bg-white rounded-lg shadow-md overflow-x-auto"><table class="w-full text-left"><thead class="bg-gray-50"><tr><th class="p-4 w-12"></th><th class="p-4 font-semibold cursor-pointer sortable-header" data-sort-key="name">종목명</th><th class="p-4 font-semibold text-right cursor-pointer sortable-header" data-sort-key="price">현재가</th><th class="p-4 font-semibold text-right cursor-pointer sortable-header" data-sort-key="change">등락</th><th class="p-4 font-semibold text-right cursor-pointer sortable-header" data-sort-key="changeRate">등락률</th><th class="p-4 font-semibold text-right cursor-pointer sortable-header" data-sort-key="volume">거래량</th></tr></thead><tbody id="stock-list-body"></tbody></table></div>`; renderStockList(state.kospiStocks); }
+        function renderStockList(stocks) { const listBody=document.getElementById('stock-list-body'); if(!listBody)return; const sortedStocks=[...stocks].sort((a,b)=>{const{key,order}=state.domesticSort;if(a[key]<b[key])return order==='asc'?-1:1;if(a[key]>b[key])return order==='asc'?1:-1;return 0}); document.querySelectorAll('.sortable-header').forEach(h=>{h.innerHTML=h.innerHTML.replace(/ [▲▼]$/,'');if(h.dataset.sortKey===state.domesticSort.key)h.innerHTML+=state.domesticSort.order==='asc'?' ▲':' ▼'}); if(sortedStocks.length===0){listBody.innerHTML='<tr><td colspan="6" class="text-center p-8 text-gray-500">검색 결과가 없습니다.</td></tr>';return} listBody.innerHTML=sortedStocks.map(s=>{const isFavorite=state.isLoggedIn&&state.favorites.includes(s.code);const color=s.change>0?'text-red-500':s.change<0?'text-blue-500':'text-gray-500';const sign=s.change>0?'+':'';return`<tr class="stock-row hover:bg-gray-100 border-b last:border-b-0" data-stock-code="${s.code}"><td class="p-4"><button class="toggle-favorite-btn text-2xl z-10 relative" data-stock-code="${s.code}">${state.isLoggedIn?(isFavorite?icons.starFilled:icons.starOutline):icons.starOutline}</button></td><td class="p-4 font-medium"><div class="text-gray-900">${s.name}</div><div class="text-sm text-gray-400">${s.code}</div></td><td class="p-4 text-right font-semibold ${color}">${s.price.toLocaleString()}원</td><td class="p-4 text-right ${color}">${sign}${s.change.toLocaleString()}원</td><td class="p-4 text-right ${color}">${sign}${s.changeRate.toFixed(2)}%</td><td class="p-4 text-right text-sm text-gray-600">${s.volume.toLocaleString()}</td></tr>`}).join('')}
 
         async function renderStockDetailModal(stockCode) {
             const stock = state.kospiStocks.find(s => s.code === stockCode);
-            state.activeIndicators['detail'] = []; // Reset indicators on modal open
             const modalHTML = `
             <div id="stock-detail-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4">
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-6 max-w-4xl w-full transform transition-all scale-95 opacity-0 overflow-y-auto max-h-[90vh]">
-                    <div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
-                        <h2 class="text-xl font-bold text-gray-900 dark:text-white">${stock.name} (${stock.code})</h2>
-                        <button id="close-detail-modal" class="text-2xl text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">&times;</button>
+                <div class="bg-white rounded-lg shadow-2xl p-6 max-w-4xl w-full transform transition-all scale-95 opacity-0">
+                    <div class="flex justify-between items-center border-b border-gray-200 pb-3 mb-4">
+                        <h2 class="text-xl font-bold">${stock.name} (${stock.code})</h2>
+                        <button id="close-detail-modal" class="text-2xl text-gray-500 hover:text-gray-800">&times;</button>
                     </div>
-                    <div class="flex flex-wrap justify-between items-center mb-2 gap-2 text-xs">
-                        <div>
-                            <span class="font-semibold mr-2">차트 종류:</span>
-                            <button class="chart-control-btn px-3 py-1 rounded-full" data-chart-id="detail" data-action="set-type" data-type="line">선 차트</button>
-                            <button class="chart-control-btn px-3 py-1 rounded-full" data-chart-id="detail" data-action="set-type" data-type="candlestick">캔들 차트</button>
+                    <div class="flex justify-between items-center mb-2">
+                        <div id="indicator-controls" class="flex items-center space-x-2 text-xs">
+                             <button class="indicator-btn px-3 py-1 rounded-full" data-indicator="sma20">SMA(20)</button>
+                             <button class="indicator-btn px-3 py-1 rounded-full" data-indicator="ema60">EMA(60)</button>
+                             <div class="tooltip-container">
+                                 ${icons.info}
+                                 <span class="tooltip-text"><b>SMA (단순이동평균):</b> 특정 기간의 주가를 산술 평균한 값입니다.<br/><b>EMA (지수이동평균):</b> 최근 주가에 더 높은 가중치를 부여하는 평균값입니다.</span>
+                             </div>
                         </div>
-                        <div>
-                            <span class="font-semibold mr-2">보조지표:</span>
-                            <button class="chart-control-btn px-3 py-1 rounded-full tooltip-container" data-chart-id="detail" data-action="toggle-indicator" data-indicator="MA" title="이동평균선(20일): 주가의 단기 추세를 파악합니다.">MA</button>
-                            <button class="chart-control-btn px-3 py-1 rounded-full tooltip-container" data-chart-id="detail" data-action="toggle-indicator" data-indicator="BB" title="볼린저 밴드(20일, 2σ): 주가의 변동성 범위를 보여줍니다.">BB</button>
-                            <button class="chart-control-btn px-3 py-1 rounded-full tooltip-container" data-chart-id="detail" data-action="toggle-indicator" data-indicator="RSI" title="상대강도지수(14일): 주가의 과매수/과매도 상태를 나타냅니다.">RSI</button>
+                        <div class="flex space-x-2 text-xs">
+                            <button class="detail-chart-type-btn px-3 py-1 rounded-full" data-type="line">선 차트</button>
+                            <button class="detail-chart-type-btn px-3 py-1 rounded-full" data-type="candlestick">캔들 차트</button>
                         </div>
                     </div>
-                    <div class="h-96 mb-4"><canvas id="detail-chart"></canvas></div>
+                    <div class="h-72 mb-4"><canvas id="detail-chart"></canvas></div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                         <div>
-                            <h3 class="font-semibold mb-2 text-gray-900 dark:text-white">AI 1주일 예측 (종가)</h3>
-                            <table class="w-full text-sm text-left"><thead class="bg-gray-50 dark:bg-gray-700"><tr><th class="p-2 font-medium text-gray-700 dark:text-gray-300">날짜</th><th class="p-2 text-right font-medium text-gray-700 dark:text-gray-300">예상 종가</th></tr></thead><tbody id="prediction-table" class="dark:text-gray-300"></tbody></table>
+                            <h3 class="font-semibold mb-2">AI 1주일 예측 (종가)</h3>
+                            <table class="w-full text-sm text-left"><thead class="bg-gray-50"><tr><th class="p-2">날짜</th><th class="p-2 text-right">예상 종가</th></tr></thead><tbody id="prediction-table"></tbody></table>
                         </div>
-                        <div class="text-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                            <p class="mb-3 text-gray-700 dark:text-gray-300">더 상세한 AI 분석과 기술적 지표를 확인해보세요.</p>
-                            <button id="go-to-ai-page-from-modal" data-stock-code="${stockCode}" class="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 btn-active">AI 분석 페이지로 이동</button>
+                        <div class="text-center p-4 bg-gray-50 rounded-lg">
+                            <p class="mb-3 text-gray-700">더 상세한 AI 분석과 기술적 지표를 확인해보세요.</p>
+                            <button id="go-to-ai-page-from-modal" data-stock-code="${stockCode}" class="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700">AI 분석 페이지로 이동</button>
                         </div>
                     </div>
                 </div>
@@ -521,7 +502,7 @@
 
             const { historicalData, predictionData } = await mockApi.getStockChartData(stockCode);
             renderDetailChart(historicalData, stockCode);
-            document.getElementById('prediction-table').innerHTML = predictionData.map(d => `<tr><td class="p-2">${formatKoreanDate(d.time)}</td><td class="p-2 text-right">${formatKoreanCurrency(Math.round(d.value))}</td></tr>`).join('');
+            document.getElementById('prediction-table').innerHTML = predictionData.map(d => `<tr><td class="p-2">${formatKoreanDate(d.time)}</td><td class="p-2 text-right">${Math.round(d.value).toLocaleString()}원</td></tr>`).join('');
         }
 
         // --- Other Pages ---
@@ -530,29 +511,28 @@
             const favoriteStocks = state.kospiStocks.filter(s => state.favorites.includes(s.code));
             container.innerHTML=`
             <h1 class="text-2xl font-bold mb-1">AI 분석</h1>
-            <p class="text-gray-500 dark:text-gray-400 mb-6">NextStep의 AI가 예측한 미래 주가를 통해 투자 인사이트를 얻어보세요.</p>
+            <p class="text-gray-500 mb-6">NextStep의 AI가 예측한 미래 주가를 통해 투자 인사이트를 얻어보세요.</p>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-2">
-                    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md mb-6">
-                        <label for="ai-stock-search" class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">분석할 종목 검색:</label>
-                        <input type="search" id="ai-stock-search" placeholder="종목명 또는 코드를 검색하세요..." class="w-full p-2 border border-gray-300 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <div class="bg-white p-4 rounded-lg shadow-md mb-6">
+                        <label for="ai-stock-search" class="block text-sm font-medium mb-2">분석할 종목 검색:</label>
+                        <input type="search" id="ai-stock-search" placeholder="종목명 또는 코드를 검색하세요..." class="w-full p-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <div id="ai-search-results" class="mt-2 max-h-48 overflow-y-auto"></div>
                         ${favoriteStocks.length > 0 ? `
-                        <div class="mt-4 pt-3 border-t dark:border-gray-600">
-                            <h4 class="text-sm font-semibold mb-2 text-gray-600 dark:text-gray-400">즐겨찾기 목록:</h4>
+                        <div class="mt-4 pt-3 border-t">
+                            <h4 class="text-sm font-semibold mb-2 text-gray-600">즐겨찾기 목록:</h4>
                             <div id="ai-favorites-list" class="flex flex-wrap gap-2">
-                                ${favoriteStocks.map(s => `<button class="ai-quick-select-btn text-xs px-3 py-1 rounded-full bg-gray-200 dark:bg-gray-600 hover:bg-blue-200 dark:hover:bg-blue-800" data-stock-code="${s.code}">${s.name}</button>`).join('')}
+                                ${favoriteStocks.map(s => `<button class="ai-quick-select-btn text-xs px-3 py-1 rounded-full bg-gray-200 hover:bg-blue-200" data-stock-code="${s.code}">${s.name}</button>`).join('')}
                             </div>
                         </div>` : ''}
                     </div>
-                    <div id="ai-chart-area" class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md min-h-[400px]">
-                        ${!selectedCode ? `<div class="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">분석할 종목을 검색하거나 선택해주세요.</div>` : ''}
+                    <div id="ai-chart-area" class="bg-white p-6 rounded-lg shadow-md min-h-[400px]">
+                        ${!selectedCode ? `<div class="flex items-center justify-center h-full text-gray-500">분석할 종목을 검색하거나 선택해주세요.</div>` : ''}
                     </div>
                 </div>
-                <div id="ai-recommendations-panel" class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md h-fit"></div>
+                <div id="ai-recommendations-panel" class="bg-white p-6 rounded-lg shadow-md h-fit"></div>
             </div>`;
             if(selectedCode){
-                state.activeIndicators['ai'] = [];
                 updateAiChart(selectedCode);
             } 
             renderAiRecommendations();
@@ -563,21 +543,21 @@
             if(!panel) return;
             const recommendations=await mockApi.getAiRecommendations();
             panel.innerHTML=`
-            <h3 class="text-lg font-bold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2 flex items-center text-gray-900 dark:text-white">AI 매매 신호 
+            <h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2 flex items-center">AI 매매 신호 
                 <div class="tooltip-container ml-2">
-                    <span class="cursor-pointer text-blue-500">ⓘ</span>
+                    ${icons.info}
                     <span class="tooltip-text">GRU(Gated Recurrent Unit) AI 모델이 과거 3년치 주가 패턴을 학습하여 향후 1주일간의 상승/하락 추세를 예측합니다. '매수'는 상승 확률이, '매도'는 하락 확률이 높음을 의미합니다.</span>
                 </div>
             </h3>
             <div class="space-y-4">${recommendations.map(r=>`
-                <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                <div class="p-3 rounded-lg bg-gray-50">
                     <div class="flex justify-between items-center">
-                        <p class="font-semibold text-gray-900 dark:text-white">${r.name}</p>
-                        <span class="text-xs font-bold px-2 py-1 rounded-full ${{'매수':'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300','매도':'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300','보유':'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}[r.signal]}">${r.signal}</span>
+                        <p class="font-semibold">${r.name}</p>
+                        <span class="text-xs font-bold px-2 py-1 rounded-full ${{'매수':'bg-red-100 text-red-800','매도':'bg-blue-100 text-blue-800','보유':'bg-gray-100 text-gray-800'}[r.signal]}">${r.signal}</span>
                     </div>
-                    <div class="text-sm mt-2 text-gray-600 dark:text-gray-400">
+                    <div class="text-sm mt-2 text-gray-600">
                         <p>신뢰도: ${(r.confidence*100).toFixed(0)}%</p>
-                        <p>목표가: ${formatKoreanCurrency(r.targetPrice)}</p>
+                        <p>목표가: ${r.targetPrice.toLocaleString()}원</p>
                     </div>
                 </div>`).join('')}
             </div>`;
@@ -587,30 +567,40 @@
             const newsItems=await mockApi.getNews();
             container.innerHTML=`
             <h1 class="text-2xl font-bold mb-1">뉴스</h1>
-            <p class="text-gray-500 dark:text-gray-400 mb-6">AI가 요약한 최신 경제 뉴스와 시장 감성 분석을 확인하세요.</p>
+            <p class="text-gray-500 mb-6">AI가 요약한 최신 경제 뉴스와 시장 감성 분석을 확인하세요.</p>
             <div class="space-y-6">${newsItems.map(item=>`
-                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                <div class="bg-white p-6 rounded-lg shadow-md">
                     <div class="flex justify-between items-start mb-2">
-                        <a href="${item.url}" target="_blank" class="text-lg font-bold hover:underline text-gray-900 dark:text-white">${item.title}</a>
-                        <span class="text-xs font-bold px-2 py-1 rounded-full whitespace-nowrap ${item.sentiment==='positive'?'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300':'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'}">${item.sentiment==='positive'?'긍정':'부정'}</span>
+                        <a href="${item.url}" target="_blank" class="text-lg font-bold hover:underline text-gray-900">${item.title}</a>
+                        <span class="text-xs font-bold px-2 py-1 rounded-full whitespace-nowrap ${item.sentiment==='positive'?'bg-red-100 text-red-800':'bg-blue-100 text-blue-800'}">${item.sentiment==='positive'?'긍정':'부정'}</span>
                     </div>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">${item.source} · ${item.time}</p>
-                    <p class="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">${item.summary}</p>
+                    <p class="text-xs text-gray-500 mb-4">${item.source} · ${item.time}</p>
+                    <p class="text-gray-700 text-sm leading-relaxed">${item.summary}</p>
                 </div>`).join('')}
             </div>`;
         }
         
-        function renderMarketPage(container){ 
+        async function renderMarketPage(container){ 
+            const indices = await mockApi.getIndices();
             container.innerHTML=`
             <h1 class="text-2xl font-bold mb-1">시장 지표</h1>
-            <p class="text-gray-500 dark:text-gray-400 mb-6">주요 시장 지표의 상세 정보를 확인하세요.</p>
+            <p class="text-gray-500 mb-6">주요 시장 지표의 상세 정보를 확인하세요.</p>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-                    <h3 class="text-lg font-bold mb-4 text-gray-900 dark:text-white">금 시세 (1kg)</h3>
+                 <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-lg font-bold mb-2">금 시세</h3>
+                    <div class="space-y-2 text-lg">
+                        <p class="flex justify-between"><span>1kg</span> <strong>${indices.gold.price1kg.toLocaleString()}원</strong></p>
+                        <p class="flex justify-between"><span>100g</span> <strong>${indices.gold.price100g.toLocaleString()}원</strong></p>
+                    </div>
                     <div class="h-64 mt-4"><canvas id="gold-chart"></canvas></div>
                 </div>
-                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-                    <h3 class="text-lg font-bold mb-4 text-gray-900 dark:text-white">WTI 유가 (휘발유)</h3>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-lg font-bold mb-2">유가 정보 (리터당)</h3>
+                    <div class="space-y-2 text-lg">
+                        <p class="flex justify-between"><span>휘발유</span> <strong>${indices.oil.gasoline.toLocaleString()}원</strong></p>
+                        <p class="flex justify-between"><span>경유</span> <strong>${indices.oil.diesel.toLocaleString()}원</strong></p>
+                        <p class="flex justify-between"><span>등유</span> <strong>${indices.oil.kerosene.toLocaleString()}원</strong></p>
+                    </div>
                     <div class="h-64 mt-4"><canvas id="oil-chart"></canvas></div>
                 </div>
             </div>`;
@@ -620,18 +610,18 @@
         function renderMockInvestmentPage(container) { 
             container.innerHTML=`
             <h1 class="text-2xl font-bold mb-1">모의 투자</h1>
-            <p class="text-gray-500 dark:text-gray-400 mb-6">AI 예측을 기반으로 가상 투자를 경험하고, 투자 결과를 미리 확인해보세요.</p>
-            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md max-w-lg mx-auto">
+            <p class="text-gray-500 mb-6">AI 예측을 기반으로 가상 투자를 경험하고, 투자 결과를 미리 확인해보세요.</p>
+            <div class="bg-white p-6 rounded-lg shadow-md max-w-lg mx-auto">
                 <div class="grid grid-cols-2 gap-4 mb-4">
-                    <select id="mock-stock-select" class="p-2 border border-gray-300 rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 col-span-2 sm:col-span-1">${state.kospiStocks.map(s=>`<option value="${s.code}">${s.name}</option>`).join('')}</select>
-                    <input type="number" id="mock-quantity" placeholder="수량 (예: 10)" min="1" class="p-2 border border-gray-300 rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 col-span-2 sm:col-span-1">
+                    <select id="mock-stock-select" class="p-2 border border-gray-300 rounded-lg col-span-2 sm:col-span-1">${state.kospiStocks.map(s=>`<option value="${s.code}">${s.name}</option>`).join('')}</select>
+                    <input type="number" id="mock-quantity" placeholder="수량 (예: 10)" min="1" class="p-2 border border-gray-300 rounded-lg col-span-2 sm:col-span-1">
                 </div>
-                <button id="mock-calculate-btn" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 btn-active">결과 계산하기</button>
-                <div id="mock-result" class="mt-6 pt-6 border-t dark:border-gray-600">
-                    <div class="flex items-center justify-center text-gray-500 dark:text-gray-400">
+                <button id="mock-calculate-btn" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">결과 계산하기</button>
+                <div id="mock-result" class="mt-6 pt-6 border-t">
+                    <div class="flex items-center justify-center text-gray-500">
                         <p>종목과 수량을 입력하고 결과를 확인하세요.</p>
                         <div class="tooltip-container ml-2">
-                            <span class="cursor-pointer text-blue-500">ⓘ</span>
+                            ${icons.info}
                             <span class="tooltip-text">'현재 가치'는 현재가 x 수량, '예상 가치'는 AI가 7일 후로 예측한 종가 x 수량으로 계산됩니다. '예상 손익'은 두 가치의 차액입니다. 이는 실제 수익을 보장하지 않습니다.</span>
                         </div>
                     </div>
@@ -643,28 +633,30 @@
             const favoriteStocks = state.kospiStocks.filter(stock => state.favorites.includes(stock.code));
             container.innerHTML=`
             <h1 class="text-2xl font-bold mb-1">MY</h1>
-            <p class="text-gray-500 dark:text-gray-400 mb-6">계정 정보를 관리하고 즐겨찾기 종목을 편집할 수 있습니다.</p>
+            <p class="text-gray-500 mb-6">계정 정보를 관리하고 즐겨찾기 종목을 편집할 수 있습니다.</p>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-                    <h3 class="text-lg font-bold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2 text-gray-900 dark:text-white">계정 정보 수정</h3>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">계정 정보 수정</h3>
                     <form id="update-user-form">
                         <div class="space-y-4">
-                            <p><strong class="text-gray-600 dark:text-gray-400">아이디:</strong> ${state.currentUser.username}</p>
-                            <p><strong class="text-gray-600 dark:text-gray-400">이메일:</strong> ${state.currentUser.email}</p>
-                            <div><label class="text-sm font-medium text-gray-700 dark:text-gray-300">새 비밀번호</label><input type="password" id="new-password" class="w-full mt-1 p-2 border border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600" placeholder="새 비밀번호 입력"></div>
-                            <div><label class="text-sm font-medium text-gray-700 dark:text-gray-300">비밀번호 확인</label><input type="password" id="confirm-password" class="w-full mt-1 p-2 border border-gray-300 rounded bg-white dark:bg-gray-700 dark:border-gray-600" placeholder="새 비밀번호 확인"></div>
-                            <button type="submit" class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 btn-active">정보 저장</button>
-                            <button type="button" id="delete-account-btn" class="w-full mt-2 bg-red-600 text-white py-2 rounded hover:bg-red-700 btn-active">회원 탈퇴</button>
+                            <p><strong class="text-gray-600">아이디:</strong> ${state.currentUser.username}</p>
+                            <p><strong class="text-gray-600">이메일:</strong> ${state.currentUser.email}</p>
+                            <div><label class="text-sm font-medium">새 비밀번호</label><input type="password" id="new-password" class="w-full mt-1 p-2 border border-gray-300 rounded" placeholder="새 비밀번호 입력"></div>
+                            <div><label class="text-sm font-medium">비밀번호 확인</label><input type="password" id="confirm-password" class="w-full mt-1 p-2 border border-gray-300 rounded" placeholder="새 비밀번호 확인"></div>
+                            <div class="flex justify-end items-center gap-3 pt-4">
+                                <button type="button" id="delete-account-btn" class="px-4 py-2 text-sm font-medium text-red-600 bg-red-100 rounded-lg hover:bg-red-200">회원 탈퇴</button>
+                                <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">정보 저장</button>
+                            </div>
                         </div>
                     </form>
                 </div>
-                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-                    <h3 class="text-lg font-bold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2 text-gray-900 dark:text-white">즐겨찾기 목록 (${favoriteStocks.length})</h3>
-                    <ul id="my-favorites-list" class="divide-y dark:divide-gray-700 max-h-96 overflow-y-auto">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">즐겨찾기 목록 (${favoriteStocks.length})</h3>
+                    <ul id="my-favorites-list" class="divide-y max-h-96 overflow-y-auto">
                         ${favoriteStocks.length > 0 ? favoriteStocks.map(stock => `
                             <li class="flex justify-between items-center py-3">
-                                <div><p class="font-medium text-gray-900 dark:text-white">${stock.name}</p><p class="text-sm text-gray-400">${stock.code}</p></div>
-                                <button data-stock-code="${stock.code}" class="my-remove-favorite-btn px-3 py-1 text-xs font-medium text-red-600 bg-red-100 dark:bg-red-900/50 dark:text-red-400 rounded-full hover:bg-red-200 dark:hover:bg-red-800">삭제</button>
+                                <div><p class="font-medium">${stock.name}</p><p class="text-sm text-gray-400">${stock.code}</p></div>
+                                <button data-stock-code="${stock.code}" class="my-remove-favorite-btn px-3 py-1 text-xs font-medium text-red-600 bg-red-100 rounded-full hover:bg-red-200">삭제</button>
                             </li>`).join('') : '<li class="text-center text-gray-500 py-8">즐겨찾는 종목이 없습니다.</li>'}
                     </ul>
                 </div>
@@ -672,122 +664,267 @@
         }
 
         // --- CHART RENDERING FUNCTIONS ---
-        function renderChart(chartId, canvasId, historicalData, predictionData = []) {
-            const ctx = document.getElementById(canvasId)?.getContext('2d');
+        function renderDetailChart(historicalData, stockCode) {
+            const ctx = document.getElementById('detail-chart')?.getContext('2d');
             if(!ctx) return;
-            if(state.charts[chartId]) state.charts[chartId].destroy();
+            if(state.charts.detail) state.charts.detail.destroy();
 
-            document.querySelectorAll(`.chart-control-btn[data-chart-id="${chartId}"]`).forEach(btn => {
-                const action = btn.dataset.action;
-                const type = btn.dataset.type;
+            document.querySelectorAll('.detail-chart-type-btn').forEach(btn => {
+                btn.classList.toggle('bg-blue-600', btn.dataset.type === state.detailChartType);
+                btn.classList.toggle('text-white', btn.dataset.type === state.detailChartType);
+                btn.classList.toggle('bg-gray-200', btn.dataset.type !== state.detailChartType);
+            });
+            document.querySelectorAll('.indicator-btn').forEach(btn => {
                 const indicator = btn.dataset.indicator;
-
-                let isActive = false;
-                if(action === 'set-type') {
-                    isActive = type === (chartId === 'ai' ? state.aiChartType : state.detailChartType);
-                } else if(action === 'toggle-indicator') {
-                    isActive = state.activeIndicators[chartId]?.includes(indicator);
-                }
-                btn.classList.toggle('bg-blue-600', isActive);
-                btn.classList.toggle('text-white', isActive);
-                btn.classList.toggle('bg-gray-200', !isActive);
-                btn.classList.toggle('dark:bg-gray-600', !isActive);
+                btn.classList.toggle('bg-blue-600', state.detailChartIndicators[indicator]);
+                btn.classList.toggle('text-white', state.detailChartIndicators[indicator]);
+                btn.classList.toggle('bg-gray-200', !state.detailChartIndicators[indicator]);
             });
 
-            const chartType = (chartId === 'ai' ? state.aiChartType : state.detailChartType);
-            const datasets = [];
-            const hasRSI = state.activeIndicators[chartId]?.includes('RSI');
+            const chartType = state.detailChartType;
+            let datasets = [];
 
-            // Main dataset (Price)
             if (chartType === 'line') {
                 datasets.push({
-                    label: '종가', data: historicalData.map(d => ({x: d.t, y: d.c})),
-                    borderColor: '#3b82f6', borderWidth: 2, pointRadius: 0, yAxisID: 'y'
+                    label: '종가',
+                    data: historicalData.map(d => ({x: d.t, y: d.c})),
+                    borderColor: '#3b82f6', borderWidth: 2, pointRadius: 0,
                 });
             } else { // candlestick
                 datasets.push({
-                    type: 'candlestick', label: '주가', data: historicalData.map(d => ({x: d.t, o: d.o, h: d.h, l: d.l, c: d.c})),
-                    color: { up: '#ef4444', down: '#3b82f6', unchanged: '#9ca3af' }, yAxisID: 'y'
+                    label: stockCode,
+                    data: historicalData.map(d => ({x: d.t, o: d.o, h: d.h, l: d.l, c: d.c})),
+                    color: { up: '#ef4444', down: '#3b82f6', unchanged: '#9ca3af' }
                 });
             }
-            
-            // Prediction dataset
-            if (predictionData.length > 0) {
-                 const lastHistoricalPoint = historicalData.length > 0 ? historicalData[historicalData.length - 1] : {t: Date.now(), c: predictionData[0].value};
-                 const predictionArea = [{ x: lastHistoricalPoint.t, y: lastHistoricalPoint.c }, ...predictionData.map(d => ({ x: d.time, y: d.value }))];
-                 datasets.push({
-                     type: 'line', label: 'AI 예측', data: predictionArea, borderColor: '#f97316',
-                     backgroundColor: 'rgba(249, 115, 22, 0.1)', borderWidth: 2, pointRadius: 0,
-                     tension: 0.1, fill: true, yAxisID: 'y'
-                 });
+            // Add indicators
+            if (state.detailChartIndicators.sma20) {
+                const smaData = calculateSMA(historicalData, 20);
+                datasets.push({ type: 'line', label: 'SMA(20)', data: smaData.map(d => ({x: d.t, y: d.y})), borderColor: '#f97316', borderWidth: 1.5, pointRadius: 0 });
+            }
+            if (state.detailChartIndicators.ema60) {
+                const emaData = calculateEMA(historicalData, 60);
+                datasets.push({ type: 'line', label: 'EMA(60)', data: emaData.map(d => ({x: d.t, y: d.y})), borderColor: '#8b5cf6', borderWidth: 1.5, pointRadius: 0 });
             }
 
-            // Indicator datasets
-            if (state.activeIndicators[chartId]?.includes('MA')) {
-                datasets.push({ type: 'line', label: 'MA(20)', data: calculateMA(historicalData, 20), borderColor: '#f59e0b', borderWidth: 1.5, pointRadius: 0, yAxisID: 'y' });
-            }
-            if (state.activeIndicators[chartId]?.includes('BB')) {
-                const { upper, lower } = calculateBollingerBands(historicalData, 20, 2);
-                datasets.push({ type: 'line', label: 'BB상단', data: upper, borderColor: '#a855f7', borderWidth: 1, pointRadius: 0, fill: false, yAxisID: 'y', borderDash: [5, 5] });
-                datasets.push({ type: 'line', label: 'BB하단', data: lower, borderColor: '#a855f7', borderWidth: 1, pointRadius: 0, fill: '-1', backgroundColor: 'rgba(168, 85, 247, 0.1)', yAxisID: 'y', borderDash: [5, 5] });
-            }
-            if (hasRSI) {
-                 datasets.push({ type: 'line', label: 'RSI(14)', data: calculateRSI(historicalData, 14), borderColor: '#10b981', borderWidth: 1.5, pointRadius: 0, yAxisID: 'yRSI' });
-            }
-
-            const gridColor = state.theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-            const fontColor = state.theme === 'dark' ? '#E5E7EB' : '#1F2937';
-
-            state.charts[chartId] = new Chart(ctx, {
-                type: 'line', // Base type
+            state.charts.detail = new Chart(ctx, {
+                type: chartType === 'line' ? 'line' : 'candlestick',
                 data: { datasets: datasets },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    scales: {
-                        x: { type: 'time', time: { unit: 'month' }, grid: { color: gridColor }, ticks: { color: fontColor } },
-                        y: { position: 'left', grid: { color: gridColor }, ticks: { color: fontColor }, height: hasRSI ? '70%' : '100%' },
-                        yRSI: { display: hasRSI, position: 'left', grid: { drawOnChartArea: false }, min: 0, max: 100, height: hasRSI ? '30%' : '0%', ticks: { color: fontColor } }
-                    },
-                    plugins: { legend: { labels: { color: fontColor }}, tooltip: { mode: 'index', intersect: false } }
-                }
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'month' } } }, plugins: { legend: { display: true, position: 'bottom', align: 'start' } } }
             });
         }
-        
-        async function renderDetailChart(historicalData, stockCode) {
-            renderChart('detail', 'detail-chart', historicalData);
-        }
-
-        async function updateKospiChart(days) { /* Not implemented as per new structure, handled by other chart functions */ }
-        
+        async function updateKospiChart(days) { const data = await mockApi.getKospiHistory(days); const ctx = document.getElementById('home-kospi-chart')?.getContext('2d'); if(!ctx) return; document.querySelectorAll('.kospi-chart-period-btn').forEach(btn => { const isSelected = parseInt(btn.dataset.days) === days; btn.classList.toggle('bg-blue-600', isSelected); btn.classList.toggle('text-white', isSelected); btn.classList.toggle('bg-gray-200', !isSelected); }); if(state.charts.kospiHome) state.charts.kospiHome.destroy(); state.charts.kospiHome = new Chart(ctx, { type: 'line', data: { datasets: [{ label: 'KOSPI', data: data.map(d => ({x: d.time, y: d.value})), borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, pointRadius: 0, tension: 0.1, fill: true, }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: days > 31 ? 'month' : 'day' }, display: false, grid: { color: 'rgba(200, 200, 200, 0.1)' } }, y: { display: false, grid: { color: 'rgba(200, 200, 200, 0.1)' } } }, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } } } }); }
         async function updateAiChart(stockCode) { 
             const chartArea = document.getElementById('ai-chart-area');
             if (!chartArea) return;
             chartArea.innerHTML = `
-                <div class="flex flex-wrap justify-between items-center mb-2 gap-2">
-                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">${state.kospiStocks.find(s => s.code === stockCode)?.name || ''} AI 분석</h3>
-                    <button id="ai-toggle-historical" class="text-xs px-3 py-1 rounded-full ${state.aiChartShowHistorical ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-600'}">과거 데이터 함께 보기</button>
-                </div>
-                 <div class="flex flex-wrap justify-between items-center mb-2 gap-2 text-xs">
-                    <div>
-                        <span class="font-semibold mr-2">차트 종류:</span>
-                        <button class="chart-control-btn px-3 py-1 rounded-full" data-chart-id="ai" data-action="set-type" data-type="line">선 차트</button>
-                        <button class="chart-control-btn px-3 py-1 rounded-full" data-chart-id="ai" data-action="set-type" data-type="candlestick">캔들 차트</button>
-                    </div>
-                    <div>
-                        <span class="font-semibold mr-2">보조지표:</span>
-                        <button class="chart-control-btn px-3 py-1 rounded-full tooltip-container" data-chart-id="ai" data-action="toggle-indicator" data-indicator="MA" title="이동평균선(20일): 주가의 단기 추세를 파악합니다.">MA</button>
-                        <button class="chart-control-btn px-3 py-1 rounded-full tooltip-container" data-chart-id="ai" data-action="toggle-indicator" data-indicator="BB" title="볼린저 밴드(20일, 2σ): 주가의 변동성 범위를 보여줍니다.">BB</button>
-                        <button class="chart-control-btn px-3 py-1 rounded-full tooltip-container" data-chart-id="ai" data-action="toggle-indicator" data-indicator="RSI" title="상대강도지수(14일): 주가의 과매수/과매도 상태를 나타냅니다.">RSI</button>
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-lg font-bold">${state.kospiStocks.find(s => s.code === stockCode)?.name || ''} 분석</h3>
+                    <div class="flex space-x-1 text-xs">
+                        <button class="ai-chart-type-btn px-3 py-1 rounded-full" data-type="line">선 차트</button>
+                        <button class="ai-chart-type-btn px-3 py-1 rounded-full" data-type="candlestick">캔들 차트</button>
                     </div>
                 </div>
-                <div class="h-[60vh]"><canvas id="ai-chart"></canvas></div>`;
+                <div class="chart-container"><canvas id="ai-chart"></canvas></div>`;
+
+            document.querySelectorAll('.ai-chart-type-btn').forEach(btn => {
+                btn.classList.toggle('bg-blue-600', btn.dataset.type === state.aiChartType);
+                btn.classList.toggle('text-white', btn.dataset.type === state.aiChartType);
+                btn.classList.toggle('bg-gray-200', btn.dataset.type !== state.aiChartType);
+            });
 
             const { historicalData, predictionData } = await mockApi.getStockChartData(stockCode);
-            const dataToShow = state.aiChartShowHistorical ? historicalData.slice(-250) : [historicalData[historicalData.length-1]]; // Show last year or just last point
-            renderChart('ai', 'ai-chart', dataToShow, predictionData);
+            if (state.charts.ai) state.charts.ai.destroy();
+            
+            const lastHistoricalPoint = historicalData.length > 0 ? historicalData[historicalData.length - 1] : {t: Date.now(), c: 50000};
+            const predictionArea = [{ x: lastHistoricalPoint.t, y: lastHistoricalPoint.c }, ...predictionData.map(d => ({ x: d.time, y: d.value }))];
+            const allValues = [...historicalData.map(d => d.h), ...historicalData.map(d => d.l), ...predictionData.map(d => d.value)];
+            const yMin = Math.min(...allValues) * 0.98;
+            const yMax = Math.max(...allValues) * 1.02;
+
+            let historicalDataset;
+            if(state.aiChartType === 'line') {
+                historicalDataset = { type: 'line', label: '과거 종가', data: historicalData.map(d => ({x: d.t, y: d.c})), borderColor: '#3b82f6', borderWidth: 2, pointRadius: 0 };
+            } else {
+                historicalDataset = { label: '과거 주가', data: historicalData.map(d => ({ x: d.t, o: d.o, h: d.h, l: d.l, c: d.c })), color: { up: '#ef4444', down: '#3b82f6', unchanged: '#9ca3af' } };
+            }
+            
+            state.charts.ai = new Chart(document.getElementById('ai-chart').getContext('2d'), { 
+                type: state.aiChartType === 'line' ? 'line' : 'candlestick',
+                data: { datasets: [ historicalDataset, { type: 'line', label: 'AI 예측', data: predictionArea, borderColor: '#f97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', borderWidth: 2, pointRadius: 0, tension: 0.1, fill: true, }] }, 
+                options: { responsive: true, maintainAspectRatio: false, layout: { padding: { bottom: 20 } }, scales: { x: { type: 'time', time: { unit: 'month' }, grid: { color: 'rgba(200, 200, 200, 0.1)' } }, y: { grid: { color: 'rgba(200, 200, 200, 0.1)' }, min: yMin, max: yMax } }, plugins: { legend: { position: 'top' }, tooltip: { mode: 'index', intersect: false } } } 
+            }); 
+        }
+        async function renderMarketCharts() { const goldData = await mockApi.getKospiHistory(365); const oilData = await mockApi.getKospiHistory(365); const goldCtx = document.getElementById('gold-chart')?.getContext('2d'); const oilCtx = document.getElementById('oil-chart')?.getContext('2d'); if(!goldCtx || !oilCtx) return; const gridColor = 'rgba(0, 0, 0, 0.1)'; const fontColor = '#1F2937'; const chartOptions = { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'month' }, ticks:{color: fontColor}, grid:{color: gridColor} }, y: { ticks: { callback: value => `${(value/1000000).toFixed(0)}백만`, color: fontColor }, grid:{color: gridColor} } }, plugins: { legend: { display: false } } }; state.charts.gold = new Chart(goldCtx, { type: 'line', data: { datasets: [{ label: '금 시세', data: goldData.map(d => ({x: d.time, y: d.value * 30000})), borderColor: '#f59e0b', borderWidth: 2, pointRadius: 0 }] }, options: chartOptions }); state.charts.oil = new Chart(oilCtx, { type: 'line', data: { datasets: [{ label: 'WTI 유가', data: oilData.map(d => ({x: d.time, y: d.value * 60})), borderColor: '#4f46e5', borderWidth: 2, pointRadius: 0 }] }, options: { ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, ticks: { callback: value => `${value.toLocaleString()}원`}} }}}); }
+        
+        // ===================================================================================
+        // TUTORIAL FUNCTIONS
+        // ===================================================================================
+        function startTutorial() {
+            if (state.tutorial.seen) return;
+            state.tutorial.active = true;
+            state.tutorial.step = 0;
+            runTutorialStep();
         }
 
-        async function renderMarketCharts() { const goldData = await mockApi.getKospiHistory(365); const oilData = await mockApi.getKospiHistory(365); const goldCtx = document.getElementById('gold-chart')?.getContext('2d'); const oilCtx = document.getElementById('oil-chart')?.getContext('2d'); if(!goldCtx || !oilCtx) return; const gridColor = state.theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'; const fontColor = state.theme === 'dark' ? '#E5E7EB' : '#1F2937'; const chartOptions = { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'month' }, ticks:{color: fontColor}, grid:{color: gridColor} }, y: { ticks: { callback: value => `${(value/1000000).toFixed(0)}백만`, color: fontColor }, grid:{color: gridColor} } }, plugins: { legend: { display: false, labels:{color:fontColor}} } }; state.charts.gold = new Chart(goldCtx, { type: 'line', data: { datasets: [{ label: '금 시세', data: goldData.map(d => ({x: d.time, y: d.value * 30000})), borderColor: '#f59e0b', borderWidth: 2, pointRadius: 0 }] }, options: chartOptions }); state.charts.oil = new Chart(oilCtx, { type: 'line', data: { datasets: [{ label: 'WTI 유가', data: oilData.map(d => ({x: d.time, y: d.value * 30})), borderColor: '#4f46e5', borderWidth: 2, pointRadius: 0 }] }, options: { ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, ticks: { callback: value => formatKoreanCurrency(value)}}} }});}
+        function advanceTutorial() {
+            state.tutorial.step++;
+            runTutorialStep();
+        }
+
+        function endTutorial(dontShowAgain = false) {
+            state.tutorial.active = false;
+            tutorialContainer.innerHTML = '';
+            if (dontShowAgain) {
+                state.tutorial.seen = true;
+                localStorage.setItem('nextstep-tutorial-seen', 'true');
+            }
+        }
+
+        async function runTutorialStep() {
+            if (!state.tutorial.active) return;
+
+            const steps = [
+                // Step 0: Start and go to Domestic Page
+                {
+                    run: () => {
+                        navigate('domestic');
+                        setTimeout(() => renderTutorialOverlay(
+                            `.nav-link[data-page='domestic']`,
+                            'NextStep 가이드에 오신 것을 환영합니다! 먼저, <strong>국내 주식</strong> 메뉴를 통해 시장 현황을 살펴보겠습니다.',
+                            { next: true, position: 'bottom' }
+                        ), 500);
+                    }
+                },
+                // Step 1: Click a stock
+                {
+                    run: () => renderTutorialOverlay(
+                        `tr[data-stock-code='${state.tutorial.stockCode}']`,
+                        `이곳에서 KOSPI 종목 리스트를 확인할 수 있습니다. <strong>'${state.tutorial.stockName}'</strong>을 클릭하여 상세 정보를 확인해보세요.`,
+                        { waitFor: 'click', on: `tr[data-stock-code='${state.tutorial.stockCode}']`, position: 'bottom' }
+                    )
+                },
+                // Step 2: Explain chart toggle
+                {
+                    run: () => setTimeout(() => renderTutorialOverlay(
+                        `.detail-chart-type-btn[data-type='candlestick']`,
+                        '차트 우측 상단의 버튼으로 <strong>선 차트</strong>와 <strong>캔들 차트</strong>를 전환할 수 있습니다.',
+                        { next: true, position: 'bottom' }
+                    ), 500)
+                },
+                // Step 3: Explain and click indicator
+                {
+                    run: () => renderTutorialOverlay(
+                        `#indicator-controls`,
+                        `차트 좌측의 버튼으로 <strong>보조지표</strong>를 추가할 수 있습니다. <strong>SMA(20)</strong>을 클릭하여 20일 이동평균선을 추가해보세요.`,
+                        { waitFor: 'click', on: `.indicator-btn[data-indicator='sma20']`, position: 'bottom' }
+                    )
+                },
+                // Step 4: Click go to AI page
+                {
+                    run: () => renderTutorialOverlay(
+                        `#go-to-ai-page-from-modal`,
+                        `잘하셨어요! 이제 이 종목에 대한 <strong>AI 분석</strong> 결과를 확인하러 가보겠습니다. 이 버튼을 클릭하세요.`,
+                        { waitFor: 'click', on: `#go-to-ai-page-from-modal`, position: 'top' }
+                    )
+                },
+                 // Step 5: Explain AI chart
+                {
+                    run: () => {
+                         closeModal();
+                         navigate('ai', { stockCode: state.tutorial.stockCode });
+                         setTimeout(() => renderTutorialOverlay(
+                            `#ai-chart`,
+                            `이곳은 AI 분석 페이지입니다. 주황색으로 표시된 영역이 AI가 예측한 <strong>향후 7일간의 주가</strong>입니다.`,
+                            { next: true, position: 'bottom' }
+                        ), 500);
+                    }
+                },
+                // Step 6: Explain AI recommendations
+                {
+                    run: () => renderTutorialOverlay(
+                        `#ai-recommendations-panel`,
+                        `우측에서는 AI가 분석한 <strong>매매 신호</strong>와 신뢰도, 목표가를 확인할 수 있습니다.`,
+                        { next: true, position: 'left' }
+                    )
+                },
+                // Step 7: Final Step
+                {
+                    run: () => renderTutorialOverlay(
+                        `a[data-page='home']`,
+                        `튜토리얼이 완료되었습니다! NextStep의 다양한 기능을 자유롭게 탐색해보세요. 로고를 클릭하면 언제든지 홈으로 돌아갈 수 있습니다.`,
+                        { finish: true, position: 'bottom' }
+                    )
+                }
+            ];
+
+            if (state.tutorial.step < steps.length) {
+                steps[state.tutorial.step].run();
+            } else {
+                endTutorial();
+            }
+        }
+
+        function renderTutorialOverlay(targetSelector, text, options) {
+            const target = document.querySelector(targetSelector);
+            if (!target) { console.warn("Tutorial target not found:", targetSelector); advanceTutorial(); return; }
+
+            const rect = target.getBoundingClientRect();
+            
+            const popoverHTML = `
+                <div id="tutorial-overlay"></div>
+                <div id="tutorial-spotlight" style="top:${rect.top-4}px; left:${rect.left-4}px; width:${rect.width+8}px; height:${rect.height+8}px;"></div>
+                <div id="tutorial-popover">
+                    <div class="tutorial-arrow"></div>
+                    <div class="text-sm mb-4">${text}</div>
+                    <div class="flex justify-between items-center">
+                        <button id="tutorial-skip-btn" class="text-xs text-gray-500 hover:underline">튜토리얼 건너뛰기</button>
+                        <div>
+                        ${options.next ? `<button id="tutorial-next-btn" class="bg-blue-600 text-white px-4 py-1 rounded-md text-sm">다음</button>` : ''}
+                        ${options.finish ? `<button id="tutorial-finish-btn" class="bg-blue-600 text-white px-4 py-1 rounded-md text-sm">완료</button>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+            tutorialContainer.innerHTML = popoverHTML;
+            
+            const popover = document.getElementById('tutorial-popover');
+            const popoverRect = popover.getBoundingClientRect();
+            const arrow = popover.querySelector('.tutorial-arrow');
+
+            // Position popover
+            if (options.position === 'bottom') {
+                popover.style.top = `${rect.bottom + 15}px`;
+                popover.style.left = `${rect.left + rect.width / 2 - popoverRect.width / 2}px`;
+                arrow.classList.add('up');
+            } else if (options.position === 'top') {
+                popover.style.top = `${rect.top - popoverRect.height - 15}px`;
+                popover.style.left = `${rect.left + rect.width / 2 - popoverRect.width / 2}px`;
+                arrow.classList.add('down');
+            } else if (options.position === 'left') {
+                popover.style.top = `${rect.top + rect.height/2 - popoverRect.height/2}px`;
+                popover.style.left = `${rect.left - popoverRect.width - 20}px`;
+            } else { // default bottom
+                popover.style.top = `${rect.bottom + 15}px`;
+                popover.style.left = `${rect.left + rect.width / 2 - popoverRect.width / 2}px`;
+                arrow.classList.add('up');
+            }
+            // Boundary checks
+            const finalPopoverRect = popover.getBoundingClientRect();
+            if(finalPopoverRect.left < 10) popover.style.left = '10px';
+            if(finalPopoverRect.right > window.innerWidth - 10) popover.style.left = `${window.innerWidth - popoverRect.width - 10}px`;
+
+
+            if (options.waitFor) {
+                const actionHandler = (e) => {
+                    if (e.target.closest(options.on)) {
+                        document.body.removeEventListener(options.waitFor, actionHandler, true);
+                        advanceTutorial();
+                    }
+                };
+                document.body.addEventListener(options.waitFor, actionHandler, true);
+            }
+        }
+
 
         // ===================================================================================
         // EVENT HANDLERS & LOGIC
@@ -804,17 +941,25 @@
             document.body.addEventListener('dragend', handleDragEnd);
         }
 
-        async function handleClicks(e) {
-            const navLink = e.target.closest('.nav-link');
+        function handleClicks(e) {
+            // Tutorial handlers first, to prevent other actions
+            if (state.tutorial.active) {
+                if(e.target.closest('#tutorial-next-btn')) { e.stopPropagation(); advanceTutorial(); return; }
+                if(e.target.closest('#tutorial-finish-btn')) { e.stopPropagation(); endTutorial(true); return; }
+                if(e.target.closest('#tutorial-skip-btn')) { e.stopPropagation(); endTutorial(true); return; }
+            }
+            
+            const navLink = e.target.closest('.nav-link, a[data-page]');
             if (navLink) { e.preventDefault(); navigate(navLink.dataset.page); }
             if (e.target.closest('#go-to-signup')) { e.preventDefault(); renderSignupPage(); }
             if (e.target.closest('#go-to-login')) { e.preventDefault(); renderLoginPage(); }
             if (e.target.closest('#logout-btn')) handleLogout();
-            if (e.target.closest('#modal-tour-btn') || e.target.closest('#close-detail-modal')) closeModal();
+            if (e.target.closest('#modal-tour-btn')) { closeModal(); }
+            if (e.target.closest('#modal-start-tutorial-btn')) { closeModal(); startTutorial(); }
+            if (e.target.closest('#close-detail-modal')) closeModal();
             if (e.target.closest('#go-to-ai-page-from-modal')) { navigate('ai', { stockCode: e.target.closest('#go-to-ai-page-from-modal').dataset.stockCode }); closeModal(); }
             const stockRow = e.target.closest('.stock-row');
             if (stockRow && !e.target.closest('.toggle-favorite-btn')) { renderStockDetailModal(stockRow.dataset.stockCode); }
-            if (e.target.closest('#theme-toggle-btn')) toggleTheme();
             if (e.target.closest('.toggle-favorite-btn')) { e.stopPropagation(); toggleFavorite(e.target.closest('.toggle-favorite-btn').dataset.stockCode); }
             if (e.target.closest('.my-remove-favorite-btn')) toggleFavorite(e.target.dataset.stockCode);
             if (e.target.closest('.sortable-header')) handleSort(e.target.closest('.sortable-header').dataset.sortKey);
@@ -842,43 +987,20 @@
                 document.getElementById('ai-stock-search').value = aiSearchResult.textContent.split('(')[0].trim();
                 document.getElementById('ai-search-results').innerHTML = '';
             }
-
-            if(e.target.id === 'ai-toggle-historical') {
-                state.aiChartShowHistorical = !state.aiChartShowHistorical;
+            if(e.target.closest('.detail-chart-type-btn')) {
+                state.detailChartType = e.target.closest('.detail-chart-type-btn').dataset.type;
+                const stockCode = document.getElementById('go-to-ai-page-from-modal').dataset.stockCode;
+                mockApi.getStockChartData(stockCode).then(({historicalData}) => renderDetailChart(historicalData, stockCode));
+            }
+             if(e.target.closest('.indicator-btn')) {
+                const indicator = e.target.closest('.indicator-btn').dataset.indicator;
+                state.detailChartIndicators[indicator] = !state.detailChartIndicators[indicator];
+                const stockCode = document.getElementById('go-to-ai-page-from-modal').dataset.stockCode;
+                mockApi.getStockChartData(stockCode).then(({historicalData}) => renderDetailChart(historicalData, stockCode));
+            }
+            if(e.target.closest('.ai-chart-type-btn')) {
+                state.aiChartType = e.target.closest('.ai-chart-type-btn').dataset.type;
                 if(state.currentParams?.stockCode) updateAiChart(state.currentParams.stockCode);
-            }
-            
-            const chartControlBtn = e.target.closest('.chart-control-btn');
-            if(chartControlBtn) {
-                const { chartId, action, type, indicator } = chartControlBtn.dataset;
-                const stockCode = chartId === 'ai' ? state.currentParams?.stockCode : document.getElementById('go-to-ai-page-from-modal')?.dataset.stockCode;
-
-                if (action === 'set-type') {
-                    if(chartId === 'ai') state.aiChartType = type;
-                    else state.detailChartType = type;
-                }
-                if (action === 'toggle-indicator') {
-                    if (!state.activeIndicators[chartId]) state.activeIndicators[chartId] = [];
-                    const index = state.activeIndicators[chartId].indexOf(indicator);
-                    if (index > -1) state.activeIndicators[chartId].splice(index, 1);
-                    else state.activeIndicators[chartId].push(indicator);
-                }
-
-                if(chartId === 'ai') {
-                    if(stockCode) updateAiChart(stockCode);
-                } else {
-                    const { historicalData } = await mockApi.getStockChartData(stockCode);
-                    renderDetailChart(historicalData, stockCode);
-                }
-            }
-            
-            if (e.target.closest('#password-toggle')) {
-                const passwordInput = document.getElementById('password');
-                const isPassword = passwordInput.type === 'password';
-                passwordInput.type = isPassword ? 'text' : 'password';
-                e.target.closest('#password-toggle').innerHTML = isPassword ? 
-                    `<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>` : 
-                    `<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>`;
             }
         }
 
@@ -906,8 +1028,8 @@
                 }
                 const filtered = state.kospiStocks.filter(s => s.name.toLowerCase().includes(searchTerm) || s.code.includes(searchTerm)).slice(0, 5);
                 resultsContainer.innerHTML = filtered.length > 0 ? 
-                    `<ul class="bg-white dark:bg-gray-700 border dark:border-gray-600 rounded-md shadow-lg">${filtered.map(s => `
-                        <li class="ai-search-result-item p-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer" data-stock-code="${s.code}">
+                    `<ul class="bg-white border rounded-md shadow-lg">${filtered.map(s => `
+                        <li class="ai-search-result-item p-2 hover:bg-gray-100 cursor-pointer" data-stock-code="${s.code}">
                             ${s.name} (${s.code})
                         </li>`).join('')}</ul>` : 
                     `<div class="p-2 text-sm text-gray-500">검색 결과가 없습니다.</div>`;
@@ -993,14 +1115,12 @@
             const pnlColor = pnl > 0 ? 'text-red-500' : 'text-blue-500';
 
             resultDiv.innerHTML = `
-                <div class="space-y-2 text-gray-800 dark:text-gray-200">
-                    <div class="flex justify-between"><span>현재 가치:</span> <strong>${formatKoreanCurrency(currentValue)}</strong></div>
-                    <div class="flex justify-between"><span>1주일 후 예상 가치:</span> <strong>${formatKoreanCurrency(futureValue)}</strong></div>
-                    <div class="flex justify-between font-bold text-lg ${pnlColor}"><span>예상 손익:</span> <strong>${pnl > 0 ? '+' : ''}${formatKoreanCurrency(pnl)}</strong></div>
+                <div class="space-y-2">
+                    <div class="flex justify-between"><span>현재 가치:</span> <strong>${Math.round(currentValue).toLocaleString()}원</strong></div>
+                    <div class="flex justify-between"><span>1주일 후 예상 가치:</span> <strong>${Math.round(futureValue).toLocaleString()}원</strong></div>
+                    <div class="flex justify-between font-bold text-lg ${pnlColor}"><span>예상 손익:</span> <strong>${pnl > 0 ? '+' : ''}${Math.round(pnl).toLocaleString()}원</strong></div>
                 </div>`;
         }
-        function toggleTheme() { state.theme = state.theme === 'light' ? 'dark' : 'light'; localStorage.setItem('nextstep-theme', state.theme); applyTheme(); renderPage(); }
-        function applyTheme() { if(state.theme === 'dark') {document.documentElement.classList.add('dark');} else { document.documentElement.classList.remove('dark');} }
         function toggleFavorite(stockCode) { const index = state.favorites.indexOf(stockCode); if (index > -1) state.favorites.splice(index, 1); else state.favorites.push(stockCode); localStorage.setItem('nextstep-favorites', JSON.stringify(state.favorites)); if (state.currentPage === 'domestic') { const searchTerm = document.getElementById('stock-search')?.value.toLowerCase() || ''; const filteredStocks = state.kospiStocks.filter(s => s.name.toLowerCase().includes(searchTerm) || s.code.includes(searchTerm)); renderStockList(filteredStocks); } else if (state.currentPage === 'my') { renderMyPage(document.querySelector('.page-content')); } else if (state.currentPage === 'home') { renderHomePage(document.querySelector('.page-content')); } else if (state.currentPage === 'ai') { renderAiAnalysisPage(document.querySelector('.page-content')); } }
         function handleSort(key){ if (state.domesticSort.key === key) { state.domesticSort.order = state.domesticSort.order === 'asc' ? 'desc' : 'asc'; } else { state.domesticSort.key = key; state.domesticSort.order = 'desc'; } const searchTerm = document.getElementById('stock-search')?.value.toLowerCase() || ''; const filteredStocks = state.kospiStocks.filter(s => s.name.toLowerCase().includes(searchTerm) || s.code.includes(searchTerm)); renderStockList(filteredStocks); }
         function toggleWidgetEditMode() { state.isWidgetEditMode = !state.isWidgetEditMode; renderHomePage(document.querySelector('.page-content')); }
@@ -1012,11 +1132,12 @@
         // INITIALIZATION
         // ===================================================================================
         async function initializeApp() {
-            applyTheme();
             setupEventListeners();
             
             if (state.isLoggedIn) {
                 state.kospiStocks = await mockApi.getKospiStocks();
+                // Add tutorial stock to the list for demonstration
+                state.kospiStocks.unshift({ code: state.tutorial.stockCode, name: state.tutorial.stockName, price: 52300, change: 800, changeRate: 1.55, volume: 1234567 });
             }
             
             renderApp();
