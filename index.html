@@ -3,13 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NextStep - AI 주식 예측</title>
+    <title>NextStep - AI 주식 분석</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
-    <script src="https://cdn.jsdelivr.net/npm/date-fns"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.1.1/build/chartjs-chart-financial.min.js"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <style>
         /* Google Fonts Import */
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
@@ -23,7 +19,7 @@
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #555; }
-
+        
         /* Page transition effect */
         .page-content { animation: fadeIn 0.5s ease-in-out; }
         @keyframes fadeIn {
@@ -33,45 +29,58 @@
 
         /* Active state for buttons */
         .btn-active:active { transform: scale(0.97); transition: transform 0.1s; }
-        .chart-container { position: relative; height: 60vh; width: 100%; }
+        .chart-container { position: relative; min-height: 450px; width: 100%; }
         .stock-row { cursor: pointer; }
         
         /* Draggable widget styles */
         .widget.dragging { opacity: 0.5; border: 2px dashed #3b82f6; }
         .widget.drag-over { transform: scale(1.02); }
 
-        /* Tooltip styles */
-        .tooltip-container { position: relative; display: inline-flex; align-items: center; }
-        .tooltip-text { visibility: hidden; width: 250px; background-color: #333; color: #fff; text-align: left; border-radius: 6px; padding: 8px 12px; position: absolute; z-index: 100; bottom: 125%; left: 50%; margin-left: -125px; opacity: 0; transition: opacity 0.3s; font-size: 12px; font-weight: normal; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        /* Tooltip for AI explanation */
+        .tooltip-container { position: relative; display: inline-block; }
+        .tooltip-text { visibility: hidden; width: 250px; background-color: #333; color: #fff; text-align: left; border-radius: 6px; padding: 10px; position: absolute; z-index: 51; bottom: 135%; left: 50%; margin-left: -125px; opacity: 0; transition: opacity 0.3s; font-size: 13px; font-weight: normal; line-height: 1.6; }
         .tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
 
-        /* Tutorial Overlay Styles */
-        #tutorial-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.7); z-index: 9998; }
-        #tutorial-spotlight { position: fixed; border-radius: 8px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7); z-index: 9999; transition: all 0.4s ease-in-out; }
-        #tutorial-popover { position: fixed; background: white; color: #333; padding: 20px; border-radius: 8px; max-width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 10000; transition: opacity 0.3s, transform 0.3s; }
-        .tutorial-arrow { position: absolute; width: 0; height: 0; border-style: solid; }
-        .tutorial-arrow.up { border-width: 0 10px 10px 10px; border-color: transparent transparent white transparent; top: -10px; left: calc(50% - 10px); }
-        .tutorial-arrow.down { border-width: 10px 10px 0 10px; border-color: white transparent transparent transparent; bottom: -10px; left: calc(50% - 10px); }
+        /* Guidebook Styles */
+        #guidebook-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 999;
+            transition: opacity 0.3s ease;
+        }
+        .guidebook-highlight {
+            position: relative;
+            z-index: 1000;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
+            border-radius: 6px;
+            transition: all 0.3s ease-in-out;
+        }
+        #guidebook-modal {
+            position: fixed;
+            z-index: 1001;
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: all 0.3s ease-out;
+            border: 1px solid #e2e8f0;
+        }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800 transition-colors duration-300">
+<body class="bg-gray-50 text-gray-800 transition-colors duration-300">
 
     <div id="app" class="flex flex-col min-h-screen"></div>
+    
     <div id="modal-container"></div>
-    <div id="tutorial-container"></div>
+    <div id="guidebook-container"></div>
 
     <script type="module">
-        // ===================================================================================
-        // SVG ICONS
-        // ===================================================================================
-        const icons = {
-            arrowUp: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>`,
-            arrowDown: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>`,
-            starFilled: `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-400" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>`,
-            starOutline: `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>`,
-            info: `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 cursor-pointer" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
-        };
-
         // ===================================================================================
         // MOCK DATA (백엔드 API 모의 데이터)
         // ===================================================================================
@@ -111,22 +120,22 @@
                 return Promise.resolve({ message: '회원 탈퇴가 완료되었습니다.' });
             },
             getKospiStocks: () => Promise.resolve([
-                { code: '005930', name: '삼성전자', price: 78000, change: 1200, changeRate: 1.56, volume: 15000000 },
-                { code: '000660', name: 'SK하이닉스', price: 130000, change: -2000, changeRate: -1.52, volume: 8000000 },
-                { code: '035420', name: 'NAVER', price: 215000, change: 500, changeRate: 0.23, volume: 1200000 },
-                { code: '035720', name: '카카오', price: 55000, change: -800, changeRate: -1.43, volume: 5500000 },
-                { code: '207940', name: '삼성바이오로직스', price: 780000, change: 10000, changeRate: 1.30, volume: 300000 },
-                { code: '005380', name: '현대차', price: 200000, change: 3000, changeRate: 1.52, volume: 900000 },
-                { code: '005490', name: 'POSCO홀딩스', price: 410000, change: -5000, changeRate: -1.20, volume: 750000 },
-                { code: '051910', name: 'LG화학', price: 450000, change: 7000, changeRate: 1.58, volume: 600000 },
+                { code: '005930', name: '삼성전자', price: 82000, change: 1200, changeRate: 1.49, volume: 18000000 },
+                { code: '000660', name: 'SK하이닉스', price: 230000, change: -2500, changeRate: -1.08, volume: 9500000 },
+                { code: '035420', name: 'NAVER', price: 195000, change: 500, changeRate: 0.26, volume: 1500000 },
+                { code: '035720', name: '카카오', price: 48000, change: -800, changeRate: -1.64, volume: 6000000 },
+                { code: '207940', name: '삼성바이오로직스', price: 750000, change: 10000, changeRate: 1.35, volume: 400000 },
+                { code: '005380', name: '현대차', price: 280000, change: 3000, changeRate: 1.08, volume: 1100000 },
+                { code: '005490', name: 'POSCO홀딩스', price: 380000, change: -5000, changeRate: -1.30, volume: 850000 },
+                { code: '051910', name: 'LG화학', price: 420000, change: 7000, changeRate: 1.69, volume: 700000 },
             ]),
             getStockChartData: (stockCode) => {
                 const today = new Date();
                 const historicalData = [];
                 const predictionData = [];
-                let lastClose = Math.random() * 100000 + 50000;
+                let lastClose = stockCode === 'TUTORIAL-01' ? 50000 : Math.random() * 100000 + 50000;
 
-                for (let i = 365 * 3; i > 0; i--) {
+                for (let i = 365 * 2; i > 0; i--) {
                     const date = new Date(today);
                     date.setDate(today.getDate() - i);
                     if (date.getDay() === 0 || date.getDay() === 6) continue;
@@ -134,11 +143,11 @@
                     const high = Math.max(open, lastClose) * (1 + Math.random() * 0.03);
                     const low = Math.min(open, lastClose) * (1 - Math.random() * 0.03);
                     const close = low + Math.random() * (high - low);
-                    historicalData.push({ t: date.getTime(), o: open, h: high, l: low, c: close });
+                    historicalData.push({ x: date.getTime(), y: [open, high, low, close] });
                     lastClose = close;
                 }
                 
-                let lastPrediction = historicalData.length > 0 ? historicalData[historicalData.length - 1].c : lastClose;
+                let lastPrediction = historicalData.length > 0 ? historicalData[historicalData.length - 1].y[3] : lastClose;
                 for (let i = 1; i <= 7; i++) {
                     const date = new Date();
                     date.setDate(date.getDate() + i);
@@ -149,37 +158,33 @@
                 return Promise.resolve({ historicalData, predictionData });
             },
             getIndices: () => Promise.resolve({
-                kospi: { value: 2750.43, change: 12.33, changeRate: 0.45 },
-                gold: { price1kg: 85000000, price100g: 8550000 },
-                oil: { gasoline: 1750, diesel: 1680, kerosene: 1200 },
+                kospi: { value: 2810.55, change: 15.12, changeRate: 0.54 },
+                gold: { price1kg: 108500000, price100g: 10900000 },
+                oil: { gasoline: 1720, diesel: 1650, kerosene: 1180 },
             }),
-            getAiPicks: () => Promise.resolve([
-                { code: '005930', name: '삼성전자', reason: '반도체 업황 개선 기대' },
-                { code: '005380', name: '현대차', reason: '신규 전기차 모델 판매 호조' },
-            ]),
             getAiRecommendations: () => Promise.resolve([
-                { code: '000660', name: 'SK하이닉스', signal: '매수', confidence: 0.85, targetPrice: 145000 },
-                { code: '035720', name: '카카오', signal: '보유', confidence: 0.65, targetPrice: 58000 },
-                { code: '005490', name: 'POSCO홀딩스', signal: '매도', confidence: 0.78, targetPrice: 390000 },
+                { code: '000660', name: 'SK하이닉스', signal: '매수', confidence: 0.85, targetPrice: 250000 },
+                { code: '035720', name: '카카오', signal: '보유', confidence: 0.65, targetPrice: 52000 },
+                { code: '005490', name: 'POSCO홀딩스', signal: '매도', confidence: 0.78, targetPrice: 360000 },
             ]),
             getNews: () => Promise.resolve([
-                { id: 1, url: 'https://www.etnews.com', title: "삼성전자, AI 칩 '마하-1' 공개...", source: "전자신문", time: "2시간 전", summary: "삼성전자가 자체 개발한 AI 칩 '마하-1'을 공개하며 엔비디아의 아성에 도전합니다...", sentiment: "positive" },
-                { id: 2, url: 'https://www.yna.co.kr', title: "현대차, 미국 전기차 시장 점유율 10% 돌파", source: "연합뉴스", time: "5시간 전", summary: "현대자동차가 아이오닉 시리즈의 인기에 힘입어 미국 전기차 시장에서 11%의 점유율을 기록했습니다...", sentiment: "positive" },
+                { id: 1, url: '#', title: "삼성전자, 차세대 AI 칩 '마하-2' 공개 임박...", source: "전자신문", time: "2시간 전", summary: "삼성전자가 자체 개발한 AI 칩 '마하-2'를 공개하며 엔비디아의 아성에 도전합니다. 업계의 판도를 바꿀 수 있을지 귀추가 주목됩니다.", sentiment: "positive" },
+                { id: 2, url: '#', title: "현대차, 미국 전기차 시장 점유율 15% 돌파 쾌거", source: "연합뉴스", time: "5시간 전", summary: "현대자동차가 아이오닉 시리즈의 꾸준한 인기에 힘입어 미국 전기차 시장에서 15%의 점유율을 기록하며 테슬라를 맹추격하고 있습니다.", sentiment: "positive" },
             ]),
             getKospiHistory: (days) => {
-                const data = []; let lastValue = 2750; const today = new Date();
+                const data = []; let lastValue = 2810; const today = new Date();
                 for(let i=days; i>0; i--){
                     const date = new Date(today); date.setDate(today.getDate() - i);
                     if (date.getDay() === 0 || date.getDay() === 6) continue;
                     lastValue *= (1 + (Math.random() - 0.48) * 0.015);
-                    data.push({time: date.getTime(), value: lastValue});
+                    data.push({x: date.getTime(), y: lastValue});
                 }
                 return Promise.resolve(data);
             },
         };
 
         // ===================================================================================
-        // APPLICATION STATE
+        // APPLICATION STATE & UTILITIES
         // ===================================================================================
         const state = {
             isLoggedIn: !!localStorage.getItem('nextstep-token'),
@@ -191,60 +196,37 @@
             widgets: JSON.parse(localStorage.getItem('nextstep-widgets')) || [
                 { id: 'indices', type: 'indices' }, { id: 'kospiChart', type: 'kospiChart' },
                 { id: 'topVolume', type: 'topVolume' }, { id: 'favorites', type: 'favorites' },
+                { id: 'goldPrice', type: 'goldPrice' }, { id: 'oilPrice', type: 'oilPrice' },
             ],
             isWidgetEditMode: false,
             domesticSort: { key: 'volume', order: 'desc' },
             charts: {},
             draggedWidgetId: null,
-            detailChartType: 'line',
-            detailChartIndicators: { sma20: false, ema60: false },
+            detailChartType: 'candlestick',
             aiChartType: 'candlestick',
-            tutorial: {
-                active: false,
-                step: 0,
-                seen: localStorage.getItem('nextstep-tutorial-seen') === 'true',
-                stockCode: 'T0001',
-                stockName: '(튜토리얼) 넥스트스텝'
-            }
+            guidebookStep: 0,
+            isGuidebookActive: false,
         };
 
-        // ===================================================================================
-        // UTILITY FUNCTIONS
-        // ===================================================================================
-        function formatKoreanDate(timestamp) {
-            return new Date(timestamp).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+        function formatKoreanDate(timestamp, format = 'long') {
+            const options = { year: 'numeric', month: format, day: 'numeric' };
+            return new Date(timestamp).toLocaleDateString('ko-KR', options);
         }
-
-        function calculateSMA(data, period) {
-            const result = [];
-            for (let i = period - 1; i < data.length; i++) {
-                const sum = data.slice(i - period + 1, i + 1).reduce((acc, val) => acc + val.c, 0);
-                result.push({ t: data[i].t, y: sum / period });
-            }
-            return result;
-        }
-
-        function calculateEMA(data, period) {
-            const result = [];
-            const k = 2 / (period + 1);
-            if (data.length < period) return [];
-            
-            let sma = data.slice(0, period).reduce((acc, val) => acc + val.c, 0) / period;
-            result.push({ t: data[period - 1].t, y: sma });
-
-            for (let i = period; i < data.length; i++) {
-                const ema = (data[i].c * k) + (result[result.length - 1].y * (1 - k));
-                result.push({ t: data[i].t, y: ema });
-            }
-            return result;
-        }
-
+        
+        // SVG Icons
+        const svgIcons = {
+            starFilled: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-yellow-400"><path fill-rule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.007z" clip-rule="evenodd" /></svg>`,
+            starOutline: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-gray-400"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg>`,
+            sortAsc: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 ml-1"><path fill-rule="evenodd" d="M10 17a.75.75 0 01-.75-.75V5.612L6.22 8.64a.75.75 0 11-1.06-1.06l4.25-4.25a.75.75 0 011.06 0l4.25 4.25a.75.75 0 11-1.06 1.06L10.75 5.612V16.25A.75.75 0 0110 17z" clip-rule="evenodd" /></svg>`,
+            sortDesc: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 ml-1"><path fill-rule="evenodd" d="M10 3a.75.75 0 01.75.75v10.638l3.03-3.03a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L6.22 12.47a.75.75 0 111.06-1.06l3.03 3.03V3.75A.75.75 0 0110 3z" clip-rule="evenodd" /></svg>`,
+        };
+        
         // ===================================================================================
         // RENDER FUNCTIONS
         // ===================================================================================
         const appContainer = document.getElementById('app');
         const modalContainer = document.getElementById('modal-container');
-        const tutorialContainer = document.getElementById('tutorial-container');
+        const guidebookContainer = document.getElementById('guidebook-container');
         
         function renderApp() {
             if (!state.isLoggedIn) {
@@ -256,9 +238,9 @@
                 <main id="app-main" class="flex-grow container mx-auto p-4 md:p-6"></main>`;
             renderPage();
             
-            if (localStorage.getItem('nextstep-hide-welcome') !== 'true' && !sessionStorage.getItem('welcome-shown') && !state.tutorial.seen) {
-                renderWelcomeModal();
-                sessionStorage.setItem('welcome-shown', 'true');
+            if (localStorage.getItem('nextstep-hide-guidebook') !== 'true' && !sessionStorage.getItem('guidebook-shown')) {
+                startGuidebook();
+                sessionStorage.setItem('guidebook-shown', 'true');
             }
         }
 
@@ -269,25 +251,22 @@
                 { id: 'home', text: '홈' }, { id: 'domestic', text: '국내' }, { id: 'news', text: '뉴스' },
                 { id: 'market', text: '시장' }, { id: 'ai', text: 'AI 분석' }, { id: 'mock', text: '모의투자' }, { id: 'my', text: 'MY' }
             ];
-            const navItems = navLinks.map(link => `<a href="#" data-page="${link.id}" class="nav-link px-3 py-2 rounded-md text-sm font-medium transition-colors ${state.currentPage === link.id ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-200'}">${link.text}</a>`).join('');
+            const navItems = navLinks.map(link => `<a href="#" data-page="${link.id}" class="nav-link px-4 py-2 rounded-md text-sm font-medium transition-colors ${state.currentPage === link.id ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}">${link.text}</a>`).join('');
             header.innerHTML = `
-                <div class="container mx-auto px-4 sm:px-6 lg:px-8"><div class="flex items-center justify-between h-16">
-                    <div class="flex items-center">
-                        <a href="#" data-page="home" class="flex-shrink-0 flex items-center gap-2">
-                             <svg class="h-10 w-auto" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 2L2 7V17L12 22L22 17V7L12 2Z" fill="#3B82F6"/>
-                                <path d="M12 2L17 4.5V13.5L12 11V2Z" fill="#60A5FA"/>
-                                <path d="M12 11L7 13.5V20L12 22V11Z" fill="#2563EB"/>
-                             </svg>
-                             <span class="font-bold text-xl text-gray-800">NextStep</span>
-                        </a>
+                <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex items-center justify-between h-16">
+                        <div class="flex items-center">
+                            <a href="#" data-page="home" class="flex-shrink-0 flex items-center">
+                                <img src="logo.png" alt="NextStep Logo" class="h-10 w-auto">
+                            </a>
+                        </div>
+                        <nav class="hidden md:flex flex-grow justify-center space-x-2">${navItems}</nav>
+                        <div class="flex items-center space-x-4">
+                            <span class="text-sm font-medium text-gray-700"><strong>${state.currentUser.username}</strong>님</span>
+                            <button id="logout-btn" class="text-sm font-medium text-gray-500 hover:text-blue-600 btn-active">로그아웃</button>
+                        </div>
                     </div>
-                    <nav class="hidden md:flex flex-grow justify-center space-x-4">${navItems}</nav>
-                    <div class="flex items-center space-x-4">
-                        <span class="text-sm font-medium text-gray-700"><strong>${state.currentUser.username}</strong>님</span>
-                        <button id="logout-btn" class="text-sm font-medium text-gray-500 hover:text-blue-600 btn-active">로그아웃</button>
-                    </div>
-                </div></div>`;
+                </div>`;
         }
         
         function renderPage() {
@@ -314,22 +293,16 @@
         // --- Auth & Modal Pages ---
         function renderLoginPage(error = null) {
             appContainer.innerHTML = `
-            <div class="min-h-screen flex items-center justify-center bg-gray-50">
+            <div class="min-h-screen flex items-center justify-center bg-gray-100">
                 <div class="max-w-md w-full bg-white p-8 rounded-lg shadow-lg">
-                    <div class="flex justify-center items-center mb-6 gap-2">
-                         <svg class="h-12 w-auto" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7V17L12 22L22 17V7L12 2Z" fill="#3B82F6"/><path d="M12 2L17 4.5V13.5L12 11V2Z" fill="#60A5FA"/><path d="M12 11L7 13.5V20L12 22V11Z" fill="#2563EB"/></svg>
-                         <span class="font-bold text-3xl text-gray-800">NextStep</span>
-                    </div>
+                    <a href="#" onclick="window.location.reload()"><img src="logo.png" alt="Logo" class="w-48 mx-auto mb-6"></a>
                     <form id="login-form">
                         ${error ? `<p class="text-red-500 text-sm mb-4 text-center">${error}</p>` : ''}
                         <div class="mb-4">
                             <label for="username" class="block text-sm font-medium mb-1 text-gray-700">아이디</label>
                             <input type="text" id="username" name="username" required class="w-full px-3 py-2 border border-gray-300 rounded-md" value="test">
                         </div>
-                        <div class="mb-6">
-                            <label for="password" class="block text-sm font-medium mb-1 text-gray-700">비밀번호</label>
-                            <input type="password" id="password" name="password" required class="w-full px-3 py-2 border border-gray-300 rounded-md" value="test1234">
-                        </div>
+                        <div class="mb-6"><label for="password" class="block text-sm font-medium mb-1 text-gray-700">비밀번호</label><input type="password" id="password" name="password" required class="w-full px-3 py-2 border border-gray-300 rounded-md" value="test1234"></div>
                         <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700">로그인</button>
                         <p class="text-center mt-4 text-sm text-gray-600">계정이 없으신가요? <a href="#" id="go-to-signup" class="text-blue-500 hover:underline">회원가입</a></p>
                     </form>
@@ -339,7 +312,7 @@
 
         function renderSignupPage(error = null) {
             appContainer.innerHTML = `
-            <div class="min-h-screen flex items-center justify-center bg-gray-50">
+            <div class="min-h-screen flex items-center justify-center bg-gray-100">
                 <div class="max-w-md w-full bg-white p-8 rounded-lg shadow-lg">
                     <h2 class="text-2xl font-bold text-center mb-6 text-gray-900">회원가입</h2>
                     ${error ? `<p class="text-red-500 text-sm mb-4 text-center">${error}</p>` : ''}
@@ -353,34 +326,6 @@
                 </div>
             </div>`;
         }
-        
-        function renderWelcomeModal() {
-            modalContainer.innerHTML = `
-            <div id="welcome-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4">
-                <div class="bg-white rounded-lg shadow-2xl p-8 max-w-lg w-full transform transition-all scale-95 opacity-0">
-                    <div class="text-center">
-                        <svg class="h-12 w-auto mx-auto mb-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7V17L12 22L22 17V7L12 2Z" fill="#3B82F6"/><path d="M12 2L17 4.5V13.5L12 11V2Z" fill="#60A5FA"/><path d="M12 11L7 13.5V20L12 22V11Z" fill="#2563EB"/></svg>
-                        <h2 class="text-2xl font-bold text-gray-900 mb-2">NextStep에 오신 것을 환영합니다!</h2>
-                        <p class="text-gray-600 mb-6">AI 기술로 당신의 성공적인 투자를 돕는 파트너입니다.</p>
-                    </div>
-                    <div class="space-y-4 text-left mb-6">
-                        <h3 class="font-semibold text-lg text-gray-800 border-b border-gray-200 pb-2">주요 기능</h3>
-                        <p class="text-gray-700">📈 <strong class="font-medium">AI 예측 및 고급 차트:</strong> AI 예측과 기술적 보조지표(SMA, EMA)로 심층 분석을 경험하세요.</p>
-                        <p class="text-gray-700">⭐ <strong class="font-medium">나만의 홈 화면:</strong> 자주 찾는 위젯을 홈 화면에 배치하고 드래그하여 순서를 바꿔보세요.</p>
-                        <p class="text-gray-700">📊 <strong class="font-medium">핵심 경제 지표:</strong> 금, 유가 등 시장의 흐름을 읽는 필수 데이터를 제공합니다.</p>
-                    </div>
-                    <div class="flex flex-col sm:flex-row gap-3">
-                        <button id="modal-tour-btn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg">바로 시작하기</button>
-                        <button id="modal-start-tutorial-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">가이드 시작하기</button>
-                    </div>
-                    <div class="mt-6 text-center">
-                        <label class="flex items-center justify-center text-sm text-gray-500 cursor-pointer"><input type="checkbox" id="modal-dont-show-again" class="mr-2"> 다시는 보지 않기</label>
-                    </div>
-                </div>
-            </div>`;
-            const modalContent = modalContainer.querySelector('#welcome-modal > div');
-            setTimeout(() => { modalContent.style.transform = 'scale(1)'; modalContent.style.opacity = '1'; }, 50);
-        }
 
         // --- Home Page ---
         async function renderHomePage(container) {
@@ -388,25 +333,23 @@
             container.innerHTML = `
                 <div class="flex justify-between items-center mb-4">
                     <h1 class="text-2xl font-bold">홈</h1>
-                    <div class="flex items-center gap-2">
-                        ${state.isWidgetEditMode ? `<div class="tooltip-container"><span class="text-sm text-gray-500">위젯을 길게 눌러 드래그하면 순서를 변경할 수 있습니다.</span></div>` : ''}
-                        <button id="widget-edit-toggle" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg btn-active">${editButtonText}</button>
-                    </div>
+                    <button id="widget-edit-toggle" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg btn-active">${editButtonText}</button>
                 </div>
-                <div id="widget-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+                ${state.isWidgetEditMode ? `<p id="widget-drag-guide" class="text-center text-sm text-gray-500 mb-4 bg-blue-50 p-3 rounded-lg border border-blue-200">✨ 위젯을 드래그하여 순서를 변경해보세요.</p>`: ''}
+                <div id="widget-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 auto-rows-fr"></div>
                 ${state.isWidgetEditMode ? renderAddWidgetPanel() : ''}`;
             renderWidgets();
         }
         
         function renderAddWidgetPanel() {
-            const availableWidgets = [
-                { type: 'indices', name: 'KOSPI 지수' }, { type: 'kospiChart', name: 'KOSPI 차트' },
-                { type: 'gold', name: '금 시세' }, { type: 'oil', name: '유가 정보' },
-                { type: 'topVolume', name: '주요 거래량 종목' }, { type: 'favorites', name: '내 즐겨찾기' }
+            const allWidgetTypes = [
+                { type: 'indices', name: '핵심 지표' }, { type: 'kospiChart', name: 'KOSPI 차트' },
+                { type: 'topVolume', name: '주요 종목' }, { type: 'favorites', name: '내 즐겨찾기' },
+                { type: 'goldPrice', name: '금 시세' }, { type: 'oilPrice', name: '유가 정보' }
             ];
-            const widgetButtons = availableWidgets.map(w => {
+            const widgetButtons = allWidgetTypes.map(w => {
                 const isAdded = state.widgets.some(sw => sw.type === w.type);
-                return `<button data-widget-type="${w.type}" class="add-widget-btn text-left p-3 rounded-lg ${isAdded ? 'bg-gray-200 cursor-not-allowed text-gray-500' : 'bg-gray-100 hover:bg-blue-100'}" ${isAdded ? 'disabled' : ''}><p class="font-semibold">${w.name}</p></button>`
+                return `<button data-widget-type="${w.type}" class="add-widget-btn text-left p-3 rounded-lg ${isAdded ? 'bg-gray-200 cursor-not-allowed text-gray-500' : 'bg-gray-100 hover:bg-blue-100'}" ${isAdded ? 'disabled' : ''}><p class="font-semibold">${w.name}</p></button>`;
             }).join('');
             return `<div id="add-widget-panel" class="mt-8 bg-white p-6 rounded-lg shadow-md"><h3 class="text-lg font-bold mb-4">위젯 추가하기</h3><div class="grid grid-cols-2 sm:grid-cols-4 gap-4">${widgetButtons}</div></div>`;
         }
@@ -416,11 +359,13 @@
             if (!grid) return;
             grid.innerHTML = '';
             
+            const indicesData = await mockApi.getIndices();
+            
             for (const widgetConfig of state.widgets) {
                 const widgetEl = document.createElement('div');
                 widgetEl.id = widgetConfig.id;
                 widgetEl.dataset.widgetType = widgetConfig.type;
-                widgetEl.className = 'widget bg-white p-6 rounded-lg shadow-md relative transition-transform';
+                widgetEl.className = 'widget bg-white p-6 rounded-lg shadow-md relative transition-transform flex flex-col';
                 if(state.isWidgetEditMode) {
                     widgetEl.draggable = true;
                     widgetEl.classList.add('cursor-move');
@@ -429,15 +374,14 @@
                 let content = '';
                 if (state.isWidgetEditMode) content += `<button data-widget-id="${widgetConfig.id}" class="remove-widget-btn absolute -top-2 -right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center font-bold text-xs z-10">&times;</button>`;
                 
-                const indicesData = await mockApi.getIndices();
                 let isClickable = false;
                 switch (widgetConfig.type) {
                     case 'indices': content += renderIndicesWidget(indicesData); break;
-                    case 'gold': content += renderGoldWidget(indicesData); break;
-                    case 'oil': content += renderOilWidget(indicesData); break;
                     case 'kospiChart': widgetEl.classList.add('md:col-span-2', 'xl:col-span-2'); content += renderKospiChartWidget(); break;
                     case 'topVolume': isClickable = true; content += renderTopVolumeWidget(); break;
                     case 'favorites': isClickable = true; content += await renderFavoritesWidget(); break;
+                    case 'goldPrice': content += renderGoldWidget(indicesData); break;
+                    case 'oilPrice': content += renderOilWidget(indicesData); break;
                 }
                 widgetEl.innerHTML = content;
                 if(isClickable && !state.isWidgetEditMode) {
@@ -449,19 +393,32 @@
             }
         }
         
-        function renderIndicesWidget(data) { return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">KOSPI 지수</h3><div class="space-y-3"><div class="flex justify-between items-center"><span class="font-medium text-gray-700">현재 지수</span><div>${data.kospi.value.toFixed(2)} <span class="${data.kospi.change > 0 ? 'text-red-500':'text-blue-500'}">${data.kospi.change > 0 ? icons.arrowUp : icons.arrowDown} ${Math.abs(data.kospi.change).toFixed(2)}</span></div></div></div>`; }
-        function renderGoldWidget(data) { return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">금 시세</h3><div class="space-y-3"><div class="flex justify-between items-center"><span class="font-medium text-gray-700">1kg</span><div>${data.gold.price1kg.toLocaleString()}원</div></div><div class="flex justify-between items-center"><span class="font-medium text-gray-700">100g</span><div>${data.gold.price100g.toLocaleString()}원</div></div></div>`; }
-        function renderOilWidget(data) { return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">유가 정보</h3><div class="space-y-3"><div class="flex justify-between items-center"><span class="font-medium text-gray-700">휘발유</span><div>${data.oil.gasoline.toLocaleString()}원</div></div><div class="flex justify-between items-center"><span class="font-medium text-gray-700">경유</span><div>${data.oil.diesel.toLocaleString()}원</div></div></div>`; }
-        function renderKospiChartWidget(){ return `<div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">KOSPI 지수</h3><div class="flex space-x-1 text-xs"><button data-days="7" class="kospi-chart-period-btn px-2 py-1 rounded bg-blue-600 text-white">1주</button><button data-days="30" class="kospi-chart-period-btn px-2 py-1 rounded bg-gray-200">1달</button><button data-days="365" class="kospi-chart-period-btn px-2 py-1 rounded bg-gray-200">1년</button></div></div><div class="h-48"><canvas id="home-kospi-chart"></canvas></div>`; }
-        function renderTopVolumeWidget() { const stocks = [...state.kospiStocks].sort((a,b)=>b.volume-a.volume).slice(0,5); const sign = (val) => val > 0 ? '+' : ''; const color = (val) => val > 0 ? 'text-red-500' : val < 0 ? 'text-blue-500' : 'text-gray-500'; return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">주요 거래량 종목</h3><ul id="top-volume-list" class="space-y-2">${stocks.map(s => `<li data-stock-code="${s.code}"><div class="flex justify-between text-sm items-center"><span class="text-gray-800">${s.name}</span><div class="text-right"><span class="${color(s.change)}">${s.price.toLocaleString()}원</span><br/><span class="text-xs ${color(s.change)}">${sign(s.changeRate)}${s.changeRate.toFixed(2)}%</span></div></div></li>`).join('')}</ul>`; }
-        async function renderFavoritesWidget() { const stocks = state.kospiStocks.filter(s => state.favorites.includes(s.code)); return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">내 즐겨찾기</h3><ul class="divide-y">${stocks.length ? stocks.map(s => `<li data-stock-code="${s.code}" class="py-2"><div class="flex justify-between items-center"><span class="font-medium text-gray-800">${s.name}</span><span class="${s.change > 0 ? 'text-red-500' : 'text-blue-500'}">${s.price.toLocaleString()}원</span></div></li>`).join('') : '<li class="text-center text-gray-500 py-4">즐겨찾는 종목이 없습니다.</li>'}</ul>`; }
+        function renderIndicesWidget(data) { return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">핵심 경제 지표</h3><div class="space-y-3 flex-grow flex flex-col justify-center"><div class="flex justify-between items-center"><span class="font-medium text-gray-700">KOSPI</span><div>${data.kospi.value.toFixed(2)} <span class="${data.kospi.change > 0 ? 'text-red-500':'text-blue-500'}">${data.kospi.change > 0 ? '▲' : '▼'} ${Math.abs(data.kospi.change).toFixed(2)}</span></div></div><div class="flex justify-between items-center"><span class="font-medium text-gray-700">금 (1kg)</span><div>${data.gold.price1kg.toLocaleString()}원</div></div><div class="flex justify-between items-center"><span class="font-medium text-gray-700">휘발유</span><div>${data.oil.gasoline.toLocaleString()}원</div></div></div>`; }
+        function renderGoldWidget(data) { return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">금 시세</h3><div class="space-y-3 flex-grow flex flex-col justify-center"><div class="flex justify-between items-center"><span class="font-medium text-gray-700">1kg</span><div>${data.gold.price1kg.toLocaleString()} 원</div></div><div class="flex justify-between items-center"><span class="font-medium text-gray-700">100g</span><div>${data.gold.price100g.toLocaleString()} 원</div></div></div>`; }
+        function renderOilWidget(data) { return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">유가 정보</h3><div class="space-y-3 flex-grow flex flex-col justify-center"><div class="flex justify-between items-center"><span class="font-medium text-gray-700">휘발유</span><div>${data.oil.gasoline.toLocaleString()} 원</div></div><div class="flex justify-between items-center"><span class="font-medium text-gray-700">경유</span><div>${data.oil.diesel.toLocaleString()} 원</div></div><div class="flex justify-between items-center"><span class="font-medium text-gray-700">등유</span><div>${data.oil.kerosene.toLocaleString()} 원</div></div></div>`; }
+        function renderKospiChartWidget(){ return `<div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">KOSPI 지수</h3><div class="flex space-x-1 text-xs"><button data-days="7" class="kospi-chart-period-btn px-2 py-1 rounded bg-blue-600 text-white">1주</button><button data-days="30" class="kospi-chart-period-btn px-2 py-1 rounded bg-gray-200">1달</button><button data-days="365" class="kospi-chart-period-btn px-2 py-1 rounded bg-gray-200">1년</button></div></div><div class="h-48 flex-grow" id="home-kospi-chart"></div>`; }
+        function renderTopVolumeWidget() { const stocks = [...state.kospiStocks].sort((a,b)=>b.volume-a.volume).slice(0,5); return `<h3 id="top-volume-widget-title" class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">거래량 상위</h3><ul id="top-volume-list" class="space-y-2">${stocks.map(s => `<li data-stock-code="${s.code}"><div class="flex justify-between text-sm items-center"><span class="font-medium text-gray-800">${s.name}</span><span class="${s.change > 0 ? 'text-red-500' : 'text-blue-500'}">${s.change > 0 ? '+' : ''}${s.changeRate.toFixed(2)}%</span></div></li>`).join('')}</ul>`; }
+        async function renderFavoritesWidget() { const stocks = state.kospiStocks.filter(s => state.favorites.includes(s.code)); return `<h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">내 즐겨찾기</h3><ul class="divide-y">${stocks.length ? stocks.map(s => `<li data-stock-code="${s.code}" class="py-2"><div class="flex justify-between items-center"><span class="font-medium text-gray-800">${s.name}</span><span class="${s.change > 0 ? 'text-red-500' : 'text-blue-500'}">${s.price.toLocaleString()}</span></div></li>`).join('') : '<li class="text-center text-gray-500 py-4">즐겨찾는 종목이 없습니다.</li>'}</ul>`; }
         
         // --- Domestic Page & Modal ---
-        function renderDomesticPage(container) { container.innerHTML = `<h1 class="text-2xl font-bold mb-1">국내</h1><p class="text-gray-500 mb-6">KOSPI 종목의 현재 시세를 확인하고, 상세 차트를 분석해보세요.</p><div class="mb-4"><input type="text" id="stock-search" placeholder="종목명 또는 코드를 검색하세요..." class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></div><div class="bg-white rounded-lg shadow-md overflow-x-auto"><table class="w-full text-left"><thead class="bg-gray-50"><tr><th class="p-4 w-12"></th><th class="p-4 font-semibold cursor-pointer sortable-header" data-sort-key="name">종목명</th><th class="p-4 font-semibold text-right cursor-pointer sortable-header" data-sort-key="price">현재가</th><th class="p-4 font-semibold text-right cursor-pointer sortable-header" data-sort-key="change">등락</th><th class="p-4 font-semibold text-right cursor-pointer sortable-header" data-sort-key="changeRate">등락률</th><th class="p-4 font-semibold text-right cursor-pointer sortable-header" data-sort-key="volume">거래량</th></tr></thead><tbody id="stock-list-body"></tbody></table></div>`; renderStockList(state.kospiStocks); }
-        function renderStockList(stocks) { const listBody=document.getElementById('stock-list-body'); if(!listBody)return; const sortedStocks=[...stocks].sort((a,b)=>{const{key,order}=state.domesticSort;if(a[key]<b[key])return order==='asc'?-1:1;if(a[key]>b[key])return order==='asc'?1:-1;return 0}); document.querySelectorAll('.sortable-header').forEach(h=>{h.innerHTML=h.innerHTML.replace(/ [▲▼]$/,'');if(h.dataset.sortKey===state.domesticSort.key)h.innerHTML+=state.domesticSort.order==='asc'?' ▲':' ▼'}); if(sortedStocks.length===0){listBody.innerHTML='<tr><td colspan="6" class="text-center p-8 text-gray-500">검색 결과가 없습니다.</td></tr>';return} listBody.innerHTML=sortedStocks.map(s=>{const isFavorite=state.isLoggedIn&&state.favorites.includes(s.code);const color=s.change>0?'text-red-500':s.change<0?'text-blue-500':'text-gray-500';const sign=s.change>0?'+':'';return`<tr class="stock-row hover:bg-gray-100 border-b last:border-b-0" data-stock-code="${s.code}"><td class="p-4"><button class="toggle-favorite-btn text-2xl z-10 relative" data-stock-code="${s.code}">${state.isLoggedIn?(isFavorite?icons.starFilled:icons.starOutline):icons.starOutline}</button></td><td class="p-4 font-medium"><div class="text-gray-900">${s.name}</div><div class="text-sm text-gray-400">${s.code}</div></td><td class="p-4 text-right font-semibold ${color}">${s.price.toLocaleString()}원</td><td class="p-4 text-right ${color}">${sign}${s.change.toLocaleString()}원</td><td class="p-4 text-right ${color}">${sign}${s.changeRate.toFixed(2)}%</td><td class="p-4 text-right text-sm text-gray-600">${s.volume.toLocaleString()}</td></tr>`}).join('')}
+        function renderDomesticPage(container) { container.innerHTML = `<h1 class="text-2xl font-bold mb-1">국내</h1><p class="text-gray-500 mb-6">KOSPI 종목의 현재 시세를 확인하고, 상세 차트를 분석해보세요.</p><div class="mb-4"><input type="text" id="stock-search" placeholder="종목명 또는 코드를 검색하세요..." class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></div><div class="bg-white rounded-lg shadow-md overflow-x-auto"><table class="w-full text-left"><thead class="bg-gray-50"><tr><th class="p-4 w-12"></th><th class="p-4 font-semibold cursor-pointer sortable-header flex items-center" data-sort-key="name">종목명</th><th class="p-4 font-semibold text-right cursor-pointer sortable-header" data-sort-key="price">현재가</th><th class="p-4 font-semibold text-right cursor-pointer sortable-header" data-sort-key="changeRate">등락률</th><th class="p-4 font-semibold text-right cursor-pointer sortable-header" data-sort-key="volume">거래량</th></tr></thead><tbody id="stock-list-body"></tbody></table></div>`; renderStockList(state.kospiStocks); }
+        function renderStockList(stocks) {
+            const listBody=document.getElementById('stock-list-body'); if(!listBody)return;
+            const sortedStocks=[...stocks].sort((a,b)=>{const{key,order}=state.domesticSort;if(a[key]<b[key])return order==='asc'?-1:1;if(a[key]>b[key])return order==='asc'?1:-1;return 0});
+            document.querySelectorAll('.sortable-header').forEach(h=>{
+                const currentText = h.innerText.trim();
+                h.innerHTML = `${currentText.replace(/ [▲▼]$/,'')} <span class="sort-icon-container"></span>`;
+                if(h.dataset.sortKey===state.domesticSort.key) {
+                    h.querySelector('.sort-icon-container').innerHTML = state.domesticSort.order === 'asc' ? svgIcons.sortAsc : svgIcons.sortDesc;
+                }
+            });
+            if(sortedStocks.length===0){listBody.innerHTML='<tr><td colspan="5" class="text-center p-8 text-gray-500">검색 결과가 없습니다.</td></tr>';return}
+            listBody.innerHTML=sortedStocks.map(s=>{const isFavorite=state.isLoggedIn&&state.favorites.includes(s.code);const color=s.change>0?'text-red-500':s.change<0?'text-blue-500':'text-gray-500';const sign=s.change>0?'+':'';return`<tr class="stock-row hover:bg-gray-100 border-b last:border-b-0" data-stock-code="${s.code}"><td class="p-4"><button class="toggle-favorite-btn" data-stock-code="${s.code}">${isFavorite ? svgIcons.starFilled : svgIcons.starOutline}</button></td><td class="p-4 font-medium"><div class="text-gray-900">${s.name}</div><div class="text-sm text-gray-400">${s.code}</div></td><td class="p-4 text-right font-semibold ${color}">${s.price.toLocaleString()}</td><td class="p-4 text-right ${color}">${sign}${s.changeRate.toFixed(2)}%</td><td class="p-4 text-right text-sm text-gray-600">${s.volume.toLocaleString()}</td></tr>`}).join('')
+        }
 
         async function renderStockDetailModal(stockCode) {
             const stock = state.kospiStocks.find(s => s.code === stockCode);
+            if (!stock) return;
             const modalHTML = `
             <div id="stock-detail-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4">
                 <div class="bg-white rounded-lg shadow-2xl p-6 max-w-4xl w-full transform transition-all scale-95 opacity-0">
@@ -469,29 +426,19 @@
                         <h2 class="text-xl font-bold">${stock.name} (${stock.code})</h2>
                         <button id="close-detail-modal" class="text-2xl text-gray-500 hover:text-gray-800">&times;</button>
                     </div>
-                    <div class="flex justify-between items-center mb-2">
-                        <div id="indicator-controls" class="flex items-center space-x-2 text-xs">
-                             <button class="indicator-btn px-3 py-1 rounded-full" data-indicator="sma20">SMA(20)</button>
-                             <button class="indicator-btn px-3 py-1 rounded-full" data-indicator="ema60">EMA(60)</button>
-                             <div class="tooltip-container">
-                                 ${icons.info}
-                                 <span class="tooltip-text"><b>SMA (단순이동평균):</b> 특정 기간의 주가를 산술 평균한 값입니다.<br/><b>EMA (지수이동평균):</b> 최근 주가에 더 높은 가중치를 부여하는 평균값입니다.</span>
-                             </div>
-                        </div>
-                        <div class="flex space-x-2 text-xs">
-                            <button class="detail-chart-type-btn px-3 py-1 rounded-full" data-type="line">선 차트</button>
-                            <button class="detail-chart-type-btn px-3 py-1 rounded-full" data-type="candlestick">캔들 차트</button>
-                        </div>
+                    <div class="flex justify-end items-center mb-2 space-x-2 text-xs">
+                        <button class="detail-chart-type-btn px-3 py-1 rounded-full" data-type="candlestick">캔들차트</button>
+                        <button class="detail-chart-type-btn px-3 py-1 rounded-full" data-type="line">선차트</button>
                     </div>
-                    <div class="h-72 mb-4"><canvas id="detail-chart"></canvas></div>
+                    <div id="detail-chart-container" class="h-80 mb-4"></div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                         <div>
-                            <h3 class="font-semibold mb-2">AI 1주일 예측 (종가)</h3>
+                            <h3 class="font-semibold mb-2 text-sm">AI 1주일 예측 (종가)</h3>
                             <table class="w-full text-sm text-left"><thead class="bg-gray-50"><tr><th class="p-2">날짜</th><th class="p-2 text-right">예상 종가</th></tr></thead><tbody id="prediction-table"></tbody></table>
                         </div>
                         <div class="text-center p-4 bg-gray-50 rounded-lg">
                             <p class="mb-3 text-gray-700">더 상세한 AI 분석과 기술적 지표를 확인해보세요.</p>
-                            <button id="go-to-ai-page-from-modal" data-stock-code="${stockCode}" class="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700">AI 분석 페이지로 이동</button>
+                            <button id="go-to-ai-page-from-modal" data-stock-code="${stockCode}" class="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700">AI 분석 바로가기</button>
                         </div>
                     </div>
                 </div>
@@ -506,7 +453,7 @@
         }
 
         // --- Other Pages ---
-        async function renderAiAnalysisPage(container) { 
+        async function renderAiAnalysisPage(container) {    
             const selectedCode = state.currentParams?.stockCode;
             const favoriteStocks = state.kospiStocks.filter(s => state.favorites.includes(s.code));
             container.innerHTML=`
@@ -526,7 +473,7 @@
                             </div>
                         </div>` : ''}
                     </div>
-                    <div id="ai-chart-area" class="bg-white p-6 rounded-lg shadow-md min-h-[400px]">
+                    <div id="ai-chart-area" class="bg-white p-6 rounded-lg shadow-md min-h-[500px]">
                         ${!selectedCode ? `<div class="flex items-center justify-center h-full text-gray-500">분석할 종목을 검색하거나 선택해주세요.</div>` : ''}
                     </div>
                 </div>
@@ -534,19 +481,19 @@
             </div>`;
             if(selectedCode){
                 updateAiChart(selectedCode);
-            } 
+            }    
             renderAiRecommendations();
         }
         
-        async function renderAiRecommendations() { 
+        async function renderAiRecommendations() {    
             const panel=document.getElementById('ai-recommendations-panel');
             if(!panel) return;
             const recommendations=await mockApi.getAiRecommendations();
             panel.innerHTML=`
-            <h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2 flex items-center">AI 매매 신호 
+            <h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2 flex items-center">AI 매매 신호    
                 <div class="tooltip-container ml-2">
-                    ${icons.info}
-                    <span class="tooltip-text">GRU(Gated Recurrent Unit) AI 모델이 과거 3년치 주가 패턴을 학습하여 향후 1주일간의 상승/하락 추세를 예측합니다. '매수'는 상승 확률이, '매도'는 하락 확률이 높음을 의미합니다.</span>
+                    <span class="cursor-pointer text-blue-500">ⓘ</span>
+                    <span class="tooltip-text">GRU(Gated Recurrent Unit) AI 모델이 과거 2년치 주가 패턴을 학습하여 향후 1주일간의 상승/하락 추세를 예측합니다. '매수'는 상승 확률이, '매도'는 하락 확률이 높음을 의미합니다.</span>
                 </div>
             </h3>
             <div class="space-y-4">${recommendations.map(r=>`
@@ -563,7 +510,7 @@
             </div>`;
         }
         
-        async function renderNewsPage(container){ 
+        async function renderNewsPage(container){    
             const newsItems=await mockApi.getNews();
             container.innerHTML=`
             <h1 class="text-2xl font-bold mb-1">뉴스</h1>
@@ -580,34 +527,24 @@
             </div>`;
         }
         
-        async function renderMarketPage(container){ 
-            const indices = await mockApi.getIndices();
+        function renderMarketPage(container){    
             container.innerHTML=`
             <h1 class="text-2xl font-bold mb-1">시장 지표</h1>
             <p class="text-gray-500 mb-6">주요 시장 지표의 상세 정보를 확인하세요.</p>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <div class="bg-white p-6 rounded-lg shadow-md">
-                    <h3 class="text-lg font-bold mb-2">금 시세</h3>
-                    <div class="space-y-2 text-lg">
-                        <p class="flex justify-between"><span>1kg</span> <strong>${indices.gold.price1kg.toLocaleString()}원</strong></p>
-                        <p class="flex justify-between"><span>100g</span> <strong>${indices.gold.price100g.toLocaleString()}원</strong></p>
-                    </div>
-                    <div class="h-64 mt-4"><canvas id="gold-chart"></canvas></div>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-lg font-bold mb-4">금 시세 (1kg)</h3>
+                    <div class="h-64 mt-4" id="gold-chart"></div>
                 </div>
                 <div class="bg-white p-6 rounded-lg shadow-md">
-                    <h3 class="text-lg font-bold mb-2">유가 정보 (리터당)</h3>
-                    <div class="space-y-2 text-lg">
-                        <p class="flex justify-between"><span>휘발유</span> <strong>${indices.oil.gasoline.toLocaleString()}원</strong></p>
-                        <p class="flex justify-between"><span>경유</span> <strong>${indices.oil.diesel.toLocaleString()}원</strong></p>
-                        <p class="flex justify-between"><span>등유</span> <strong>${indices.oil.kerosene.toLocaleString()}원</strong></p>
-                    </div>
-                    <div class="h-64 mt-4"><canvas id="oil-chart"></canvas></div>
+                    <h3 class="text-lg font-bold mb-4">WTI 유가 (휘발유)</h3>
+                    <div class="h-64 mt-4" id="oil-chart"></div>
                 </div>
             </div>`;
             renderMarketCharts();
         }
         
-        function renderMockInvestmentPage(container) { 
+        function renderMockInvestmentPage(container) {    
             container.innerHTML=`
             <h1 class="text-2xl font-bold mb-1">모의 투자</h1>
             <p class="text-gray-500 mb-6">AI 예측을 기반으로 가상 투자를 경험하고, 투자 결과를 미리 확인해보세요.</p>
@@ -621,7 +558,7 @@
                     <div class="flex items-center justify-center text-gray-500">
                         <p>종목과 수량을 입력하고 결과를 확인하세요.</p>
                         <div class="tooltip-container ml-2">
-                            ${icons.info}
+                            <span class="cursor-pointer text-blue-500">ⓘ</span>
                             <span class="tooltip-text">'현재 가치'는 현재가 x 수량, '예상 가치'는 AI가 7일 후로 예측한 종가 x 수량으로 계산됩니다. '예상 손익'은 두 가치의 차액입니다. 이는 실제 수익을 보장하지 않습니다.</span>
                         </div>
                     </div>
@@ -637,16 +574,14 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="bg-white p-6 rounded-lg shadow-md">
                     <h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">계정 정보 수정</h3>
-                    <form id="update-user-form">
-                        <div class="space-y-4">
-                            <p><strong class="text-gray-600">아이디:</strong> ${state.currentUser.username}</p>
-                            <p><strong class="text-gray-600">이메일:</strong> ${state.currentUser.email}</p>
-                            <div><label class="text-sm font-medium">새 비밀번호</label><input type="password" id="new-password" class="w-full mt-1 p-2 border border-gray-300 rounded" placeholder="새 비밀번호 입력"></div>
-                            <div><label class="text-sm font-medium">비밀번호 확인</label><input type="password" id="confirm-password" class="w-full mt-1 p-2 border border-gray-300 rounded" placeholder="새 비밀번호 확인"></div>
-                            <div class="flex justify-end items-center gap-3 pt-4">
-                                <button type="button" id="delete-account-btn" class="px-4 py-2 text-sm font-medium text-red-600 bg-red-100 rounded-lg hover:bg-red-200">회원 탈퇴</button>
-                                <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">정보 저장</button>
-                            </div>
+                    <form id="update-user-form" class="space-y-4">
+                        <p><strong class="text-gray-600 w-24 inline-block">아이디:</strong> ${state.currentUser.username}</p>
+                        <p><strong class="text-gray-600 w-24 inline-block">이메일:</strong> ${state.currentUser.email}</p>
+                        <div><label class="text-sm font-medium">새 비밀번호</label><input type="password" id="new-password" class="w-full mt-1 p-2 border border-gray-300 rounded" placeholder="새 비밀번호 입력"></div>
+                        <div><label class="text-sm font-medium">비밀번호 확인</label><input type="password" id="confirm-password" class="w-full mt-1 p-2 border border-gray-300 rounded" placeholder="새 비밀번호 확인"></div>
+                        <div class="pt-2 flex flex-col space-y-2">
+                           <button type="submit" class="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition-colors">정보 저장</button>
+                           <button type="button" id="delete-account-btn" class="w-full text-red-600 border border-red-500 py-2.5 rounded-lg hover:bg-red-50 transition-colors">회원 탈퇴</button>
                         </div>
                     </form>
                 </div>
@@ -663,10 +598,22 @@
             </div>`;
         }
 
-        // --- CHART RENDERING FUNCTIONS ---
+        // --- CHART RENDERING FUNCTIONS (with ApexCharts) ---
+        function calculateSMA(data, period) {
+            let sma = [];
+            for (let i = period - 1; i < data.length; i++) {
+                let sum = 0;
+                for (let j = 0; j < period; j++) {
+                    sum += data[i - j].y[3]; // 종가 기준
+                }
+                sma.push({ x: data[i].x, y: sum / period });
+            }
+            return sma;
+        }
+        
         function renderDetailChart(historicalData, stockCode) {
-            const ctx = document.getElementById('detail-chart')?.getContext('2d');
-            if(!ctx) return;
+            const chartContainer = document.getElementById('detail-chart-container');
+            if(!chartContainer) return;
             if(state.charts.detail) state.charts.detail.destroy();
 
             document.querySelectorAll('.detail-chart-type-btn').forEach(btn => {
@@ -674,58 +621,67 @@
                 btn.classList.toggle('text-white', btn.dataset.type === state.detailChartType);
                 btn.classList.toggle('bg-gray-200', btn.dataset.type !== state.detailChartType);
             });
-            document.querySelectorAll('.indicator-btn').forEach(btn => {
-                const indicator = btn.dataset.indicator;
-                btn.classList.toggle('bg-blue-600', state.detailChartIndicators[indicator]);
-                btn.classList.toggle('text-white', state.detailChartIndicators[indicator]);
-                btn.classList.toggle('bg-gray-200', !state.detailChartIndicators[indicator]);
-            });
+            
+            const series = state.detailChartType === 'line' ? 
+                [{ name: '종가', type: 'line', data: historicalData.map(d => ({ x: d.x, y: d.y[3] })) }] :
+                [{ name: '캔들', type: 'candlestick', data: historicalData }];
+            
+            const options = {
+                series: series,
+                chart: { type: 'candlestick', height: '100%', toolbar: { show: false } },
+                xaxis: { type: 'datetime', labels: { datetimeFormatter: { month: "yy' MMM" } } },
+                yaxis: { tooltip: { enabled: true }, labels: { formatter: (val) => val.toLocaleString() } },
+                tooltip: { x: { format: 'yyyy년 MM월 dd일' } },
+                plotOptions: { candlestick: { colors: { upward: '#ef4444', downward: '#3b82f6' } } }
+            };
 
-            const chartType = state.detailChartType;
-            let datasets = [];
-
-            if (chartType === 'line') {
-                datasets.push({
-                    label: '종가',
-                    data: historicalData.map(d => ({x: d.t, y: d.c})),
-                    borderColor: '#3b82f6', borderWidth: 2, pointRadius: 0,
-                });
-            } else { // candlestick
-                datasets.push({
-                    label: stockCode,
-                    data: historicalData.map(d => ({x: d.t, o: d.o, h: d.h, l: d.l, c: d.c})),
-                    color: { up: '#ef4444', down: '#3b82f6', unchanged: '#9ca3af' }
-                });
-            }
-            // Add indicators
-            if (state.detailChartIndicators.sma20) {
-                const smaData = calculateSMA(historicalData, 20);
-                datasets.push({ type: 'line', label: 'SMA(20)', data: smaData.map(d => ({x: d.t, y: d.y})), borderColor: '#f97316', borderWidth: 1.5, pointRadius: 0 });
-            }
-            if (state.detailChartIndicators.ema60) {
-                const emaData = calculateEMA(historicalData, 60);
-                datasets.push({ type: 'line', label: 'EMA(60)', data: emaData.map(d => ({x: d.t, y: d.y})), borderColor: '#8b5cf6', borderWidth: 1.5, pointRadius: 0 });
-            }
-
-            state.charts.detail = new Chart(ctx, {
-                type: chartType === 'line' ? 'line' : 'candlestick',
-                data: { datasets: datasets },
-                options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'month' } } }, plugins: { legend: { display: true, position: 'bottom', align: 'start' } } }
-            });
+            state.charts.detail = new ApexCharts(chartContainer, options);
+            state.charts.detail.render();
         }
-        async function updateKospiChart(days) { const data = await mockApi.getKospiHistory(days); const ctx = document.getElementById('home-kospi-chart')?.getContext('2d'); if(!ctx) return; document.querySelectorAll('.kospi-chart-period-btn').forEach(btn => { const isSelected = parseInt(btn.dataset.days) === days; btn.classList.toggle('bg-blue-600', isSelected); btn.classList.toggle('text-white', isSelected); btn.classList.toggle('bg-gray-200', !isSelected); }); if(state.charts.kospiHome) state.charts.kospiHome.destroy(); state.charts.kospiHome = new Chart(ctx, { type: 'line', data: { datasets: [{ label: 'KOSPI', data: data.map(d => ({x: d.time, y: d.value})), borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderWidth: 2, pointRadius: 0, tension: 0.1, fill: true, }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: days > 31 ? 'month' : 'day' }, display: false, grid: { color: 'rgba(200, 200, 200, 0.1)' } }, y: { display: false, grid: { color: 'rgba(200, 200, 200, 0.1)' } } }, plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } } } }); }
-        async function updateAiChart(stockCode) { 
+
+        async function updateKospiChart(days) {
+            const data = await mockApi.getKospiHistory(days);
+            const chartContainer = document.getElementById('home-kospi-chart');
+            if(!chartContainer) return;
+            document.querySelectorAll('.kospi-chart-period-btn').forEach(btn => {
+                const isSelected = parseInt(btn.dataset.days) === days;
+                btn.classList.toggle('bg-blue-600', isSelected); btn.classList.toggle('text-white', isSelected);
+                btn.classList.toggle('bg-gray-200', !isSelected);
+            });
+            if(state.charts.kospiHome) state.charts.kospiHome.destroy();
+
+            const options = {
+                series: [{ name: 'KOSPI', data: data }],
+                chart: { type: 'area', height: '100%', sparkline: { enabled: true } },
+                stroke: { curve: 'smooth', width: 2 },
+                fill: { type: 'gradient', gradient: { opacityFrom: 0.4, opacityTo: 0.1 } },
+                colors: ['#3b82f6'],
+                tooltip: {
+                    x: { format: 'yyyy/MM/dd' },
+                    y: { formatter: (val) => val.toFixed(2) }
+                }
+            };
+            state.charts.kospiHome = new ApexCharts(chartContainer, options);
+            state.charts.kospiHome.render();
+        }
+
+        async function updateAiChart(stockCode) {    
             const chartArea = document.getElementById('ai-chart-area');
             if (!chartArea) return;
+            const stock = state.kospiStocks.find(s => s.code === stockCode);
             chartArea.innerHTML = `
                 <div class="flex justify-between items-center mb-2">
-                    <h3 class="text-lg font-bold">${state.kospiStocks.find(s => s.code === stockCode)?.name || ''} 분석</h3>
+                    <h3 class="text-lg font-bold">${stock?.name || ''} 분석</h3>
                     <div class="flex space-x-1 text-xs">
-                        <button class="ai-chart-type-btn px-3 py-1 rounded-full" data-type="line">선 차트</button>
-                        <button class="ai-chart-type-btn px-3 py-1 rounded-full" data-type="candlestick">캔들 차트</button>
+                        <button class="ai-chart-type-btn px-3 py-1 rounded-full" data-type="candlestick">캔들차트</button>
+                        <button class="ai-chart-type-btn px-3 py-1 rounded-full" data-type="line">선차트</button>
                     </div>
                 </div>
-                <div class="chart-container"><canvas id="ai-chart"></canvas></div>`;
+                <div class="chart-container" id="ai-chart-wrapper"></div>
+                <div id="ai-indicators" class="mt-2 flex items-center space-x-2">
+                    <span class="text-sm font-medium">보조지표:</span>
+                    <label class="flex items-center text-sm cursor-pointer"><input type="checkbox" id="sma-20-checkbox" class="mr-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"> 20일 이동평균선(SMA)</label>
+                </div>`;
 
             document.querySelectorAll('.ai-chart-type-btn').forEach(btn => {
                 btn.classList.toggle('bg-blue-600', btn.dataset.type === state.aiChartType);
@@ -736,195 +692,242 @@
             const { historicalData, predictionData } = await mockApi.getStockChartData(stockCode);
             if (state.charts.ai) state.charts.ai.destroy();
             
-            const lastHistoricalPoint = historicalData.length > 0 ? historicalData[historicalData.length - 1] : {t: Date.now(), c: 50000};
-            const predictionArea = [{ x: lastHistoricalPoint.t, y: lastHistoricalPoint.c }, ...predictionData.map(d => ({ x: d.time, y: d.value }))];
-            const allValues = [...historicalData.map(d => d.h), ...historicalData.map(d => d.l), ...predictionData.map(d => d.value)];
-            const yMin = Math.min(...allValues) * 0.98;
-            const yMax = Math.max(...allValues) * 1.02;
-
-            let historicalDataset;
-            if(state.aiChartType === 'line') {
-                historicalDataset = { type: 'line', label: '과거 종가', data: historicalData.map(d => ({x: d.t, y: d.c})), borderColor: '#3b82f6', borderWidth: 2, pointRadius: 0 };
-            } else {
-                historicalDataset = { label: '과거 주가', data: historicalData.map(d => ({ x: d.t, o: d.o, h: d.h, l: d.l, c: d.c })), color: { up: '#ef4444', down: '#3b82f6', unchanged: '#9ca3af' } };
-            }
+            const lastHistoricalPoint = historicalData[historicalData.length - 1];
+            const predictionLine = [{ x: lastHistoricalPoint.x, y: lastHistoricalPoint.y[3] }, ...predictionData.map(d => ({ x: d.time, y: d.value }))];
             
-            state.charts.ai = new Chart(document.getElementById('ai-chart').getContext('2d'), { 
-                type: state.aiChartType === 'line' ? 'line' : 'candlestick',
-                data: { datasets: [ historicalDataset, { type: 'line', label: 'AI 예측', data: predictionArea, borderColor: '#f97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', borderWidth: 2, pointRadius: 0, tension: 0.1, fill: true, }] }, 
-                options: { responsive: true, maintainAspectRatio: false, layout: { padding: { bottom: 20 } }, scales: { x: { type: 'time', time: { unit: 'month' }, grid: { color: 'rgba(200, 200, 200, 0.1)' } }, y: { grid: { color: 'rgba(200, 200, 200, 0.1)' }, min: yMin, max: yMax } }, plugins: { legend: { position: 'top' }, tooltip: { mode: 'index', intersect: false } } } 
-            }); 
-        }
-        async function renderMarketCharts() { const goldData = await mockApi.getKospiHistory(365); const oilData = await mockApi.getKospiHistory(365); const goldCtx = document.getElementById('gold-chart')?.getContext('2d'); const oilCtx = document.getElementById('oil-chart')?.getContext('2d'); if(!goldCtx || !oilCtx) return; const gridColor = 'rgba(0, 0, 0, 0.1)'; const fontColor = '#1F2937'; const chartOptions = { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'month' }, ticks:{color: fontColor}, grid:{color: gridColor} }, y: { ticks: { callback: value => `${(value/1000000).toFixed(0)}백만`, color: fontColor }, grid:{color: gridColor} } }, plugins: { legend: { display: false } } }; state.charts.gold = new Chart(goldCtx, { type: 'line', data: { datasets: [{ label: '금 시세', data: goldData.map(d => ({x: d.time, y: d.value * 30000})), borderColor: '#f59e0b', borderWidth: 2, pointRadius: 0 }] }, options: chartOptions }); state.charts.oil = new Chart(oilCtx, { type: 'line', data: { datasets: [{ label: 'WTI 유가', data: oilData.map(d => ({x: d.time, y: d.value * 60})), borderColor: '#4f46e5', borderWidth: 2, pointRadius: 0 }] }, options: { ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, ticks: { callback: value => `${value.toLocaleString()}원`}} }}}); }
-        
-        // ===================================================================================
-        // TUTORIAL FUNCTIONS
-        // ===================================================================================
-        function startTutorial() {
-            if (state.tutorial.seen) return;
-            state.tutorial.active = true;
-            state.tutorial.step = 0;
-            runTutorialStep();
-        }
-
-        function advanceTutorial() {
-            state.tutorial.step++;
-            runTutorialStep();
-        }
-
-        function endTutorial(dontShowAgain = false) {
-            state.tutorial.active = false;
-            tutorialContainer.innerHTML = '';
-            if (dontShowAgain) {
-                state.tutorial.seen = true;
-                localStorage.setItem('nextstep-tutorial-seen', 'true');
+            let series = [];
+            if (state.aiChartType === 'line') {
+                series.push({ name: '과거 종가', type: 'line', data: historicalData.map(d => ({ x: d.x, y: d.y[3] })) });
+            } else {
+                series.push({ name: '과거 주가', type: 'candlestick', data: historicalData });
             }
-        }
+            series.push({ name: 'AI 예측', type: 'area', data: predictionLine });
 
-        async function runTutorialStep() {
-            if (!state.tutorial.active) return;
+            const sma20 = calculateSMA(historicalData, 20);
 
-            const steps = [
-                // Step 0: Start and go to Domestic Page
-                {
-                    run: () => {
-                        navigate('domestic');
-                        setTimeout(() => renderTutorialOverlay(
-                            `.nav-link[data-page='domestic']`,
-                            'NextStep 가이드에 오신 것을 환영합니다! 먼저, <strong>국내 주식</strong> 메뉴를 통해 시장 현황을 살펴보겠습니다.',
-                            { next: true, position: 'bottom' }
-                        ), 500);
-                    }
-                },
-                // Step 1: Click a stock
-                {
-                    run: () => renderTutorialOverlay(
-                        `tr[data-stock-code='${state.tutorial.stockCode}']`,
-                        `이곳에서 KOSPI 종목 리스트를 확인할 수 있습니다. <strong>'${state.tutorial.stockName}'</strong>을 클릭하여 상세 정보를 확인해보세요.`,
-                        { waitFor: 'click', on: `tr[data-stock-code='${state.tutorial.stockCode}']`, position: 'bottom' }
-                    )
-                },
-                // Step 2: Explain chart toggle
-                {
-                    run: () => setTimeout(() => renderTutorialOverlay(
-                        `.detail-chart-type-btn[data-type='candlestick']`,
-                        '차트 우측 상단의 버튼으로 <strong>선 차트</strong>와 <strong>캔들 차트</strong>를 전환할 수 있습니다.',
-                        { next: true, position: 'bottom' }
-                    ), 500)
-                },
-                // Step 3: Explain and click indicator
-                {
-                    run: () => renderTutorialOverlay(
-                        `#indicator-controls`,
-                        `차트 좌측의 버튼으로 <strong>보조지표</strong>를 추가할 수 있습니다. <strong>SMA(20)</strong>을 클릭하여 20일 이동평균선을 추가해보세요.`,
-                        { waitFor: 'click', on: `.indicator-btn[data-indicator='sma20']`, position: 'bottom' }
-                    )
-                },
-                // Step 4: Click go to AI page
-                {
-                    run: () => renderTutorialOverlay(
-                        `#go-to-ai-page-from-modal`,
-                        `잘하셨어요! 이제 이 종목에 대한 <strong>AI 분석</strong> 결과를 확인하러 가보겠습니다. 이 버튼을 클릭하세요.`,
-                        { waitFor: 'click', on: `#go-to-ai-page-from-modal`, position: 'top' }
-                    )
-                },
-                 // Step 5: Explain AI chart
-                {
-                    run: () => {
-                         closeModal();
-                         navigate('ai', { stockCode: state.tutorial.stockCode });
-                         setTimeout(() => renderTutorialOverlay(
-                            `#ai-chart`,
-                            `이곳은 AI 분석 페이지입니다. 주황색으로 표시된 영역이 AI가 예측한 <strong>향후 7일간의 주가</strong>입니다.`,
-                            { next: true, position: 'bottom' }
-                        ), 500);
-                    }
-                },
-                // Step 6: Explain AI recommendations
-                {
-                    run: () => renderTutorialOverlay(
-                        `#ai-recommendations-panel`,
-                        `우측에서는 AI가 분석한 <strong>매매 신호</strong>와 신뢰도, 목표가를 확인할 수 있습니다.`,
-                        { next: true, position: 'left' }
-                    )
-                },
-                // Step 7: Final Step
-                {
-                    run: () => renderTutorialOverlay(
-                        `a[data-page='home']`,
-                        `튜토리얼이 완료되었습니다! NextStep의 다양한 기능을 자유롭게 탐색해보세요. 로고를 클릭하면 언제든지 홈으로 돌아갈 수 있습니다.`,
-                        { finish: true, position: 'bottom' }
-                    )
+            const options = {
+                series: series,
+                chart: { type: 'line', height: '100%' },
+                tooltip: { shared: true, intersect: false, y: { formatter: (val) => val.toLocaleString() } },
+                xaxis: { type: 'datetime' },
+                yaxis: { labels: { formatter: (val) => val.toLocaleString() } },
+                stroke: { width: [2, 2], dashArray: [0, 5] },
+                colors: ['#3b82f6', '#f97316'],
+                plotOptions: { candlestick: { colors: { upward: '#ef4444', downward: '#3b82f6' } } },
+                legend: { horizontalAlign: 'left' },
+                fill: { type: ['solid', 'gradient'], gradient: { opacityFrom: 0.3, opacityTo: 0 } },
+            };
+            
+            state.charts.ai = new ApexCharts(document.getElementById('ai-chart-wrapper'), options);
+            state.charts.ai.render();
+
+            document.getElementById('sma-20-checkbox').addEventListener('change', (e) => {
+                if(e.target.checked) {
+                    state.charts.ai.appendSeries({ name: 'SMA 20', type: 'line', data: sma20, color: '#6366f1' });
+                } else {
+                    state.charts.ai.removeSeries('SMA 20');
                 }
-            ];
+            });
+        }
+        
+        async function renderMarketCharts() {
+            const goldData = await mockApi.getKospiHistory(365);
+            const oilData = await mockApi.getKospiHistory(365);
+            if (!document.getElementById('gold-chart') || !document.getElementById('oil-chart')) return;
 
-            if (state.tutorial.step < steps.length) {
-                steps[state.tutorial.step].run();
-            } else {
-                endTutorial();
-            }
+            const baseOptions = {
+                chart: { type: 'line', height: '100%', toolbar: { show: false } },
+                stroke: { curve: 'smooth', width: 2 },
+                xaxis: { type: 'datetime' }
+            };
+
+            const goldOptions = { ...baseOptions, series: [{ name: '금 시세', data: goldData.map(d => ({x: d.x, y: d.y * 38000}))}], colors: ['#f59e0b'], yaxis: { labels: { formatter: (val) => `${(val/1000000).toFixed(0)}백만` } } };
+            const oilOptions = { ...baseOptions, series: [{ name: '유가', data: oilData.map(d => ({x: d.x, y: d.y * 0.6 + 1000}))}], colors: ['#4f46e5'], yaxis: { labels: { formatter: (val) => `${val.toLocaleString()}원` } } };
+
+            if(state.charts.gold) state.charts.gold.destroy();
+            state.charts.gold = new ApexCharts(document.getElementById('gold-chart'), goldOptions);
+            state.charts.gold.render();
+            
+            if(state.charts.oil) state.charts.oil.destroy();
+            state.charts.oil = new ApexCharts(document.getElementById('oil-chart'), oilOptions);
+            state.charts.oil.render();
         }
 
-        function renderTutorialOverlay(targetSelector, text, options) {
-            const target = document.querySelector(targetSelector);
-            if (!target) { console.warn("Tutorial target not found:", targetSelector); advanceTutorial(); return; }
+        // ===================================================================================
+        // GUIDEBOOK (TUTORIAL)
+        // ===================================================================================
+        const guidebookSteps = [
+            {
+                title: 'NextStep 투어 시작!',
+                content: '안녕하세요! NextStep의 핵심 기능을 쉽고 빠르게 알려드릴게요. <br>먼저 홈 화면의 <strong>위젯</strong>부터 시작해볼까요?',
+                target: null,
+                action: 'click',
+                buttonText: '시작하기',
+                setup: () => navigate('home'),
+            },
+            {
+                title: '위젯 편집',
+                content: '이 버튼을 눌러 홈 화면에 표시할 위젯을 추가하거나 순서를 바꿀 수 있습니다. <br><strong>클릭해보세요!</strong>',
+                target: '#widget-edit-toggle',
+                action: 'click',
+                position: { top: '80px', left: '20px' }
+            },
+            {
+                title: '위젯 순서 변경',
+                content: '이제 위젯 편집 모드가 되었어요. 이 <strong>안내 문구</strong>처럼 위젯을 드래그해서 원하는 위치로 옮길 수 있습니다.',
+                target: '#widget-drag-guide',
+                action: 'click',
+                buttonText: '다음',
+                position: 'bottom',
+            },
+            {
+                title: '국내 주식 탐색',
+                content: '이제 국내 주식 시장을 살펴보러 가볼까요? 상단의 <strong>국내</strong> 메뉴를 클릭하세요.',
+                target: '.nav-link[data-page="domestic"]',
+                action: 'click',
+                position: 'bottom',
+            },
+            {
+                title: '종목 상세 정보',
+                content: '관심 있는 종목의 행을 클릭하면 상세 정보를 볼 수 있습니다. <br>가이드북을 위해 임시로 생성된 <strong>NextStep 혁신기술</strong>을 클릭해볼까요?',
+                target: '.stock-row[data-stock-code="TUTORIAL-01"]',
+                action: 'click',
+                position: 'bottom',
+                setup: () => {
+                    const tutorialStock = { code: 'TUTORIAL-01', name: 'NextStep 혁신기술', price: 50000, change: 2500, changeRate: 5.26, volume: 1234567 };
+                    state.kospiStocks.unshift(tutorialStock);
+                    renderStockList(state.kospiStocks);
+                },
+                cleanup: () => {
+                    state.kospiStocks = state.kospiStocks.filter(s => s.code !== 'TUTORIAL-01');
+                    if (state.currentPage === 'domestic') renderStockList(state.kospiStocks);
+                }
+            },
+            {
+                title: '상세 차트와 AI 분석',
+                content: '이곳에서 상세한 주가 차트를 확인하고, 더 깊이 있는 분석을 위해 <strong>AI 분석 바로가기</strong> 버튼을 누를 수 있습니다. 클릭해보세요!',
+                target: '#go-to-ai-page-from-modal',
+                action: 'click',
+                position: 'top',
+            },
+            {
+                title: 'AI 분석 페이지',
+                content: 'AI 분석 페이지로 이동했습니다! 여기서는 과거 주가와 함께 AI가 예측한 미래 주가 추세를 볼 수 있습니다.',
+                target: '#ai-chart-area',
+                action: 'click',
+                buttonText: '다음',
+                position: 'bottom',
+            },
+            {
+                title: '보조지표 활용',
+                content: '차트 아래에서 <strong>보조지표</strong>를 추가하여 기술적 분석을 할 수 있습니다. <br>체크박스를 클릭해 <strong>20일 이동평균선</strong>을 추가해보세요!',
+                target: '#ai-indicators',
+                action: 'click_child',
+                childSelector: '#sma-20-checkbox',
+                position: 'top',
+            },
+            {
+                title: '투어 완료!',
+                content: '축하합니다! NextStep의 핵심 기능을 모두 둘러보셨습니다. <br>이제 자유롭게 탐색하며 성공적인 투자를 시작해보세요!',
+                target: null,
+                action: 'click',
+                buttonText: '완료',
+            },
+        ];
 
-            const rect = target.getBoundingClientRect();
-            
-            const popoverHTML = `
-                <div id="tutorial-overlay"></div>
-                <div id="tutorial-spotlight" style="top:${rect.top-4}px; left:${rect.left-4}px; width:${rect.width+8}px; height:${rect.height+8}px;"></div>
-                <div id="tutorial-popover">
-                    <div class="tutorial-arrow"></div>
-                    <div class="text-sm mb-4">${text}</div>
-                    <div class="flex justify-between items-center">
-                        <button id="tutorial-skip-btn" class="text-xs text-gray-500 hover:underline">튜토리얼 건너뛰기</button>
-                        <div>
-                        ${options.next ? `<button id="tutorial-next-btn" class="bg-blue-600 text-white px-4 py-1 rounded-md text-sm">다음</button>` : ''}
-                        ${options.finish ? `<button id="tutorial-finish-btn" class="bg-blue-600 text-white px-4 py-1 rounded-md text-sm">완료</button>` : ''}
-                        </div>
-                    </div>
-                </div>`;
-            tutorialContainer.innerHTML = popoverHTML;
-            
-            const popover = document.getElementById('tutorial-popover');
-            const popoverRect = popover.getBoundingClientRect();
-            const arrow = popover.querySelector('.tutorial-arrow');
-
-            // Position popover
-            if (options.position === 'bottom') {
-                popover.style.top = `${rect.bottom + 15}px`;
-                popover.style.left = `${rect.left + rect.width / 2 - popoverRect.width / 2}px`;
-                arrow.classList.add('up');
-            } else if (options.position === 'top') {
-                popover.style.top = `${rect.top - popoverRect.height - 15}px`;
-                popover.style.left = `${rect.left + rect.width / 2 - popoverRect.width / 2}px`;
-                arrow.classList.add('down');
-            } else if (options.position === 'left') {
-                popover.style.top = `${rect.top + rect.height/2 - popoverRect.height/2}px`;
-                popover.style.left = `${rect.left - popoverRect.width - 20}px`;
-            } else { // default bottom
-                popover.style.top = `${rect.bottom + 15}px`;
-                popover.style.left = `${rect.left + rect.width / 2 - popoverRect.width / 2}px`;
-                arrow.classList.add('up');
+        function startGuidebook() {
+            state.isGuidebookActive = true;
+            state.guidebookStep = 0;
+            renderGuidebookStep();
+        }
+        
+        async function renderGuidebookStep() {
+            const step = guidebookSteps[state.guidebookStep];
+            if (!step) {
+                endGuidebook();
+                return;
             }
-            // Boundary checks
-            const finalPopoverRect = popover.getBoundingClientRect();
-            if(finalPopoverRect.left < 10) popover.style.left = '10px';
-            if(finalPopoverRect.right > window.innerWidth - 10) popover.style.left = `${window.innerWidth - popoverRect.width - 10}px`;
+
+            if (step.setup) await step.setup();
+
+            document.querySelectorAll('.guidebook-highlight').forEach(el => el.classList.remove('guidebook-highlight'));
+
+            guidebookContainer.innerHTML = `<div id="guidebook-backdrop"></div>`;
+            const modal = document.createElement('div');
+            modal.id = 'guidebook-modal';
+            modal.innerHTML = `
+                <p class="text-sm font-bold text-blue-600 mb-1">가이드 (${state.guidebookStep + 1}/${guidebookSteps.length})</p>
+                <h3 class="text-xl font-bold mb-3">${step.title}</h3>
+                <p class="text-gray-600 mb-5 text-sm leading-6">${step.content}</p>
+                <div class="flex items-center justify-between">
+                    ${state.guidebookStep > 0 ? `<button id="guidebook-prev" class="text-sm text-gray-500 hover:text-black">이전</button>` : '<div></div>'}
+                    ${step.buttonText ? `<button id="guidebook-next" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">${step.buttonText}</button>` : ''}
+                </div>
+                ${state.guidebookStep === 0 ? `<div class="mt-4 text-center"><label class="flex items-center justify-center text-xs text-gray-500 cursor-pointer"><input type="checkbox" id="guidebook-dont-show-again" class="mr-2"> 다시 보지 않기</label></div>` : ''}
+            `;
+            guidebookContainer.appendChild(modal);
+
+            const targetElement = step.target ? document.querySelector(step.target) : null;
+
+            if (targetElement) {
+                targetElement.classList.add('guidebook-highlight');
+                const rect = targetElement.getBoundingClientRect();
+
+                if (step.position === 'bottom') {
+                    modal.style.top = `${rect.bottom + 15}px`;
+                    modal.style.left = `${rect.left + rect.width / 2 - modal.offsetWidth / 2}px`;
+                } else if (step.position === 'top') {
+                    modal.style.top = `${rect.top - modal.offsetHeight - 15}px`;
+                    modal.style.left = `${rect.left + rect.width / 2 - modal.offsetWidth / 2}px`;
+                } else if (typeof step.position === 'object') {
+                    modal.style.top = step.position.top;
+                    modal.style.left = step.position.left;
+                } else { // default to center if no target
+                    modal.style.top = '50%';
+                    modal.style.left = '50%';
+                    modal.style.transform = 'translate(-50%, -50%)';
+                }
+                 // Adjust if modal is off-screen
+                const modalRect = modal.getBoundingClientRect();
+                if (modalRect.right > window.innerWidth - 10) modal.style.left = `${window.innerWidth - modal.offsetWidth - 10}px`;
+                if (modalRect.left < 10) modal.style.left = '10px';
 
 
-            if (options.waitFor) {
                 const actionHandler = (e) => {
-                    if (e.target.closest(options.on)) {
-                        document.body.removeEventListener(options.waitFor, actionHandler, true);
-                        advanceTutorial();
+                    if (step.action === 'click_child') {
+                         if (!e.target.closest(step.childSelector)) return;
                     }
+                    e.preventDefault();
+                    e.stopPropagation();
+                    nextGuidebookStep(actionHandler);
                 };
-                document.body.addEventListener(options.waitFor, actionHandler, true);
+                targetElement.addEventListener(step.action.startsWith('click') ? 'click' : 'mouseover', actionHandler, { once: true });
             }
         }
+        
+        function nextGuidebookStep(prevHandler = null) {
+            const currentStep = guidebookSteps[state.guidebookStep];
+            if (currentStep.cleanup) currentStep.cleanup();
+            if (currentStep.target && prevHandler) {
+                 document.querySelector(currentStep.target)?.removeEventListener(currentStep.action.startsWith('click') ? 'click' : 'mouseover', prevHandler);
+            }
 
+            state.guidebookStep++;
+            renderGuidebookStep();
+        }
+
+        function prevGuidebookStep() {
+             const currentStep = guidebookSteps[state.guidebookStep];
+             if (currentStep.cleanup) currentStep.cleanup();
+             state.guidebookStep--;
+             renderGuidebookStep();
+        }
+        
+        function endGuidebook() {
+            document.querySelectorAll('.guidebook-highlight').forEach(el => el.classList.remove('guidebook-highlight'));
+            guidebookContainer.innerHTML = '';
+            state.isGuidebookActive = false;
+        }
 
         // ===================================================================================
         // EVENT HANDLERS & LOGIC
@@ -942,27 +945,24 @@
         }
 
         function handleClicks(e) {
-            // Tutorial handlers first, to prevent other actions
-            if (state.tutorial.active) {
-                if(e.target.closest('#tutorial-next-btn')) { e.stopPropagation(); advanceTutorial(); return; }
-                if(e.target.closest('#tutorial-finish-btn')) { e.stopPropagation(); endTutorial(true); return; }
-                if(e.target.closest('#tutorial-skip-btn')) { e.stopPropagation(); endTutorial(true); return; }
+            if (state.isGuidebookActive) {
+                if (e.target.id === 'guidebook-next') nextGuidebookStep();
+                if (e.target.id === 'guidebook-prev') prevGuidebookStep();
+                if(e.target.closest('.guidebook-highlight')) return; // Allow interaction with highlighted element
             }
-            
             const navLink = e.target.closest('.nav-link, a[data-page]');
             if (navLink) { e.preventDefault(); navigate(navLink.dataset.page); }
             if (e.target.closest('#go-to-signup')) { e.preventDefault(); renderSignupPage(); }
             if (e.target.closest('#go-to-login')) { e.preventDefault(); renderLoginPage(); }
             if (e.target.closest('#logout-btn')) handleLogout();
-            if (e.target.closest('#modal-tour-btn')) { closeModal(); }
-            if (e.target.closest('#modal-start-tutorial-btn')) { closeModal(); startTutorial(); }
             if (e.target.closest('#close-detail-modal')) closeModal();
             if (e.target.closest('#go-to-ai-page-from-modal')) { navigate('ai', { stockCode: e.target.closest('#go-to-ai-page-from-modal').dataset.stockCode }); closeModal(); }
             const stockRow = e.target.closest('.stock-row');
             if (stockRow && !e.target.closest('.toggle-favorite-btn')) { renderStockDetailModal(stockRow.dataset.stockCode); }
             if (e.target.closest('.toggle-favorite-btn')) { e.stopPropagation(); toggleFavorite(e.target.closest('.toggle-favorite-btn').dataset.stockCode); }
             if (e.target.closest('.my-remove-favorite-btn')) toggleFavorite(e.target.dataset.stockCode);
-            if (e.target.closest('.sortable-header')) handleSort(e.target.closest('.sortable-header').dataset.sortKey);
+            const sortableHeader = e.target.closest('.sortable-header');
+            if (sortableHeader) handleSort(sortableHeader.dataset.sortKey);
             if (e.target.closest('#mock-calculate-btn')) handleMockCalculation();
             if (e.target.closest('#delete-account-btn')) handleDeleteAccount();
             if (e.target.closest('#widget-edit-toggle')) toggleWidgetEditMode();
@@ -992,12 +992,6 @@
                 const stockCode = document.getElementById('go-to-ai-page-from-modal').dataset.stockCode;
                 mockApi.getStockChartData(stockCode).then(({historicalData}) => renderDetailChart(historicalData, stockCode));
             }
-             if(e.target.closest('.indicator-btn')) {
-                const indicator = e.target.closest('.indicator-btn').dataset.indicator;
-                state.detailChartIndicators[indicator] = !state.detailChartIndicators[indicator];
-                const stockCode = document.getElementById('go-to-ai-page-from-modal').dataset.stockCode;
-                mockApi.getStockChartData(stockCode).then(({historicalData}) => renderDetailChart(historicalData, stockCode));
-            }
             if(e.target.closest('.ai-chart-type-btn')) {
                 state.aiChartType = e.target.closest('.ai-chart-type-btn').dataset.type;
                 if(state.currentParams?.stockCode) updateAiChart(state.currentParams.stockCode);
@@ -1012,7 +1006,9 @@
         }
 
         function handleChanges(e) {
-            if (e.target.id === 'modal-dont-show-again') localStorage.setItem('nextstep-hide-welcome', 'true');
+            if (e.target.id === 'guidebook-dont-show-again') {
+                localStorage.setItem('nextstep-hide-guidebook', e.target.checked);
+            }
         }
 
         function handleInputs(e) {
@@ -1027,11 +1023,11 @@
                     resultsContainer.innerHTML = ''; return;
                 }
                 const filtered = state.kospiStocks.filter(s => s.name.toLowerCase().includes(searchTerm) || s.code.includes(searchTerm)).slice(0, 5);
-                resultsContainer.innerHTML = filtered.length > 0 ? 
+                resultsContainer.innerHTML = filtered.length > 0 ?    
                     `<ul class="bg-white border rounded-md shadow-lg">${filtered.map(s => `
                         <li class="ai-search-result-item p-2 hover:bg-gray-100 cursor-pointer" data-stock-code="${s.code}">
                             ${s.name} (${s.code})
-                        </li>`).join('')}</ul>` : 
+                        </li>`).join('')}</ul>` :    
                     `<div class="p-2 text-sm text-gray-500">검색 결과가 없습니다.</div>`;
             }
         }
@@ -1050,15 +1046,13 @@
             localStorage.setItem('nextstep-widgets', JSON.stringify(state.widgets));
             renderWidgets();
         }
-        function handleDragEnd(e) { state.draggedWidgetId = null; document.querySelectorAll('.widget').forEach(w => w.classList.remove('dragging', 'drag-over')); }
+        function handleDragEnd() { state.draggedWidgetId = null; document.querySelectorAll('.widget').forEach(w => w.classList.remove('dragging', 'drag-over')); }
         
         // --- Core Logic Functions ---
         function navigate(page, params = null) { state.currentPage = page; state.currentParams = params; renderPage(); }
         async function handleLogin(form) {
-            const username = form.username.value;
-            const password = form.password.value;
             try {
-                const { accessToken, user } = await mockApi.login(username, password);
+                const { accessToken, user } = await mockApi.login(form.username.value, form.password.value);
                 state.isLoggedIn = true;
                 state.currentUser = user;
                 localStorage.setItem('nextstep-token', accessToken);
@@ -1078,7 +1072,7 @@
             state.currentUser = null;
             localStorage.removeItem('nextstep-token');
             localStorage.removeItem('nextstep-user');
-            sessionStorage.removeItem('welcome-shown');
+            sessionStorage.removeItem('guidebook-shown');
             renderApp();
         }
         async function handleUpdateUser(form) {
@@ -1121,11 +1115,44 @@
                     <div class="flex justify-between font-bold text-lg ${pnlColor}"><span>예상 손익:</span> <strong>${pnl > 0 ? '+' : ''}${Math.round(pnl).toLocaleString()}원</strong></div>
                 </div>`;
         }
-        function toggleFavorite(stockCode) { const index = state.favorites.indexOf(stockCode); if (index > -1) state.favorites.splice(index, 1); else state.favorites.push(stockCode); localStorage.setItem('nextstep-favorites', JSON.stringify(state.favorites)); if (state.currentPage === 'domestic') { const searchTerm = document.getElementById('stock-search')?.value.toLowerCase() || ''; const filteredStocks = state.kospiStocks.filter(s => s.name.toLowerCase().includes(searchTerm) || s.code.includes(searchTerm)); renderStockList(filteredStocks); } else if (state.currentPage === 'my') { renderMyPage(document.querySelector('.page-content')); } else if (state.currentPage === 'home') { renderHomePage(document.querySelector('.page-content')); } else if (state.currentPage === 'ai') { renderAiAnalysisPage(document.querySelector('.page-content')); } }
-        function handleSort(key){ if (state.domesticSort.key === key) { state.domesticSort.order = state.domesticSort.order === 'asc' ? 'desc' : 'asc'; } else { state.domesticSort.key = key; state.domesticSort.order = 'desc'; } const searchTerm = document.getElementById('stock-search')?.value.toLowerCase() || ''; const filteredStocks = state.kospiStocks.filter(s => s.name.toLowerCase().includes(searchTerm) || s.code.includes(searchTerm)); renderStockList(filteredStocks); }
+
+        function toggleFavorite(stockCode) {
+            const index = state.favorites.indexOf(stockCode);
+            if (index > -1) state.favorites.splice(index, 1); else state.favorites.push(stockCode);
+            localStorage.setItem('nextstep-favorites', JSON.stringify(state.favorites));
+            
+            const pageContent = document.querySelector('.page-content');
+            if (state.currentPage === 'domestic') {
+                const searchTerm = document.getElementById('stock-search')?.value.toLowerCase() || '';
+                const filteredStocks = state.kospiStocks.filter(s => s.name.toLowerCase().includes(searchTerm) || s.code.includes(searchTerm));
+                renderStockList(filteredStocks);
+            } else if (state.currentPage === 'my' && pageContent) {
+                renderMyPage(pageContent);
+            } else if (state.currentPage === 'home' && pageContent) {
+                renderHomePage(pageContent);
+            } else if (state.currentPage === 'ai' && pageContent) {
+                renderAiAnalysisPage(pageContent);
+            }
+        }
+        function handleSort(key){
+            if (state.domesticSort.key === key) {
+                state.domesticSort.order = state.domesticSort.order === 'asc' ? 'desc' : 'asc';
+            } else {
+                state.domesticSort.key = key; state.domesticSort.order = 'desc';
+            }
+            const searchTerm = document.getElementById('stock-search')?.value.toLowerCase() || '';
+            const filteredStocks = state.kospiStocks.filter(s => s.name.toLowerCase().includes(searchTerm) || s.code.includes(searchTerm));
+            renderStockList(filteredStocks);
+        }
         function toggleWidgetEditMode() { state.isWidgetEditMode = !state.isWidgetEditMode; renderHomePage(document.querySelector('.page-content')); }
         function removeWidget(widgetId) { state.widgets = state.widgets.filter(w => w.id !== widgetId); localStorage.setItem('nextstep-widgets', JSON.stringify(state.widgets)); renderHomePage(document.querySelector('.page-content')); }
-        function addWidget(widgetType) { if (!state.widgets.some(w => w.type === widgetType)) { state.widgets.push({ id: `widget-${Date.now()}`, type: widgetType }); localStorage.setItem('nextstep-widgets', JSON.stringify(state.widgets)); renderHomePage(document.querySelector('.page-content')); } }
+        function addWidget(widgetType) {
+            if (!state.widgets.some(w => w.type === widgetType)) {
+                state.widgets.push({ id: `widget-${Date.now()}`, type: widgetType });
+                localStorage.setItem('nextstep-widgets', JSON.stringify(state.widgets));
+                renderHomePage(document.querySelector('.page-content'));
+            }
+        }
         function closeModal() { modalContainer.innerHTML = ''; }
         
         // ===================================================================================
@@ -1136,8 +1163,6 @@
             
             if (state.isLoggedIn) {
                 state.kospiStocks = await mockApi.getKospiStocks();
-                // Add tutorial stock to the list for demonstration
-                state.kospiStocks.unshift({ code: state.tutorial.stockCode, name: state.tutorial.stockName, price: 52300, change: 800, changeRate: 1.55, volume: 1234567 });
             }
             
             renderApp();
